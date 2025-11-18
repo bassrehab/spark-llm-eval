@@ -156,7 +156,7 @@ class ReferenceFreeMetic(Metric):
 _METRIC_REGISTRY: dict[str, type[Metric]] = {}
 
 
-def register_metric(cls: type[Metric]) -> type[Metric]:
+def register_metric(cls_or_name=None):
     """Decorator to register a metric class.
 
     Usage:
@@ -164,9 +164,23 @@ def register_metric(cls: type[Metric]) -> type[Metric]:
         class MyMetric(Metric):
             name = "my_metric"
             ...
+
+        # or with explicit name
+        @register_metric("custom_name")
+        class MyMetric(Metric):
+            ...
     """
-    _METRIC_REGISTRY[cls.name] = cls
-    return cls
+    def decorator(cls: type[Metric]) -> type[Metric]:
+        name = cls_or_name if isinstance(cls_or_name, str) else cls.name
+        _METRIC_REGISTRY[name] = cls
+        return cls
+
+    # handle both @register_metric and @register_metric("name")
+    if cls_or_name is None or isinstance(cls_or_name, str):
+        return decorator
+    else:
+        # called as @register_metric without parentheses
+        return decorator(cls_or_name)
 
 
 def get_metric(name: str, **kwargs) -> Metric:

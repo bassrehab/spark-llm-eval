@@ -24,6 +24,28 @@ from spark_llm_eval.evaluation.aggregator import (
     compute_metrics,
 )
 
+# semantic metrics have optional dependencies
+try:
+    from spark_llm_eval.evaluation.semantic import (
+        BERTScoreMetric,
+        EmbeddingSimilarityMetric,
+        SemanticSimilarityMetric,
+    )
+    _HAS_SEMANTIC = True
+except ImportError:
+    _HAS_SEMANTIC = False
+    BERTScoreMetric = None
+    EmbeddingSimilarityMetric = None
+    SemanticSimilarityMetric = None
+
+# LLM-as-judge metrics
+from spark_llm_eval.evaluation.llm_judge import (
+    JudgeConfig,
+    LLMJudgeMetric,
+    PairwiseJudgeMetric,
+    GEvalMetric,
+)
+
 __all__ = [
     # base
     "Metric",
@@ -45,4 +67,13 @@ __all__ = [
     "MetricAggregator",
     "AggregatedMetrics",
     "compute_metrics",
+    # semantic (optional)
+    "BERTScoreMetric",
+    "EmbeddingSimilarityMetric",
+    "SemanticSimilarityMetric",
+    # llm-as-judge
+    "JudgeConfig",
+    "LLMJudgeMetric",
+    "PairwiseJudgeMetric",
+    "GEvalMetric",
 ]
