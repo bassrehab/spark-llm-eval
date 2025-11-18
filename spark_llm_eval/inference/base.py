@@ -19,10 +19,16 @@ class InferenceRequest:
     Args:
         prompt: The rendered prompt to send to the model.
         request_id: Unique ID for tracking and caching.
+        max_tokens: Maximum tokens to generate.
+        temperature: Sampling temperature.
+        stop_sequences: Sequences that stop generation.
         metadata: Optional extra data passed through to response.
     """
     prompt: str
-    request_id: str
+    request_id: str = ""
+    max_tokens: int = 1024
+    temperature: float = 0.0
+    stop_sequences: list[str] | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -31,23 +37,25 @@ class InferenceResponse:
     """Response from LLM inference.
 
     Args:
-        request_id: Matches the request that produced this response.
         text: Generated text from the model.
         input_tokens: Tokens in the prompt (for cost tracking).
         output_tokens: Tokens in the response.
         latency_ms: Time taken for the request.
         cost_usd: Estimated cost of this request.
+        request_id: Matches the request that produced this response.
         model: Model that generated this response.
+        finish_reason: Why generation stopped.
         error: If not None, indicates the request failed.
         metadata: Passed through from request.
     """
-    request_id: str
     text: str | None
     input_tokens: int
     output_tokens: int
     latency_ms: float
     cost_usd: float
+    request_id: str = ""
     model: str | None = None
+    finish_reason: str | None = None
     error: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
