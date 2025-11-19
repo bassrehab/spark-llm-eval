@@ -25,9 +25,10 @@ Current LLM evaluation tools are designed for single-machine execution. When you
 ## Features
 
 - **Distributed Inference**: Spark-native with Pandas UDFs, scales linearly with executors
+- **Multi-Provider Support**: OpenAI, Anthropic Claude, Google Gemini
 - **Statistical Rigor**: Bootstrap CIs, paired t-tests, McNemar's test, Wilcoxon, effect sizes
 - **Smart Rate Limiting**: Token bucket algorithm with RPM and TPM limits
-- **Comprehensive Metrics**: Lexical (exact match, F1, BLEU, ROUGE-L)
+- **Comprehensive Metrics**: Lexical, semantic (BERTScore, embeddings), LLM-as-judge
 - **MLflow Integration**: Full experiment tracking, artifact logging, model comparison
 - **Delta Lake Native**: Versioned datasets, time travel, ACID transactions
 
@@ -115,10 +116,15 @@ for name, metric in result.metrics.items():
 - **contains**: Substring containment check
 - **length_ratio**: Response length relative to reference
 
-### Coming Soon
-- **bertscore**: BERTScore (precision, recall, F1)
-- **embedding_similarity**: Cosine similarity of embeddings
-- **llm_judge**: LLM-as-judge evaluation with custom rubrics
+### Semantic Metrics
+- **bertscore**: BERTScore (precision, recall, F1) using contextual embeddings
+- **embedding_similarity**: Cosine similarity of sentence embeddings
+- **semantic_similarity**: Overall semantic similarity score
+
+### LLM-as-Judge
+- **llm_judge**: Customizable LLM-based evaluation with rubrics
+- **pairwise_comparison**: Compare two outputs head-to-head
+- **pointwise_grading**: Score individual outputs on defined criteria
 
 ## Statistical Features
 
@@ -217,10 +223,11 @@ black --check spark_llm_eval
 - [x] Lexical metrics with statistical rigor
 - [x] MLflow integration
 - [x] Delta Lake dataset integration
-- [ ] Multi-provider support (Anthropic, Google, vLLM)
-- [ ] Semantic metrics (BERTScore)
-- [ ] LLM-as-judge
+- [x] Multi-provider support (Anthropic, Google Gemini)
+- [x] Semantic metrics (BERTScore, embeddings)
+- [x] LLM-as-judge
 - [ ] Agent and RAG evaluation
+- [ ] vLLM/local model support
 - [ ] Unity Catalog integration
 
 ## License
