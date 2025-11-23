@@ -1,8 +1,6 @@
-version: '3.8'
-
 services:
   spark-master:
-    image: bitnami/spark:3.5.0
+    image: apache/spark:3.5.0
     container_name: spark-master
     hostname: spark-master
     environment:
@@ -15,53 +13,53 @@ services:
       - "7077:7077"   # Spark Master port
       - "4040:4040"   # Spark Application UI
     volumes:
-      - spark-data:/opt/bitnami/spark/data
+      - spark-data:/opt/spark/work-dir
       - ../:/app
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
     networks:
       - spark-network
 
   spark-worker-1:
-    image: bitnami/spark:3.5.0
+    image: apache/spark:3.5.0
     container_name: spark-worker-1
     hostname: spark-worker-1
     environment:
-      - SPARK_MODE=worker
-      - SPARK_MASTER_URL=spark://spark-master:7077
       - SPARK_WORKER_MEMORY=2G
       - SPARK_WORKER_CORES=2
     depends_on:
       - spark-master
     volumes:
-      - spark-data:/opt/bitnami/spark/data
+      - spark-data:/opt/spark/work-dir
       - ../:/app
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
     networks:
       - spark-network
 
   spark-worker-2:
-    image: bitnami/spark:3.5.0
+    image: apache/spark:3.5.0
     container_name: spark-worker-2
     hostname: spark-worker-2
     environment:
-      - SPARK_MODE=worker
-      - SPARK_MASTER_URL=spark://spark-master:7077
       - SPARK_WORKER_MEMORY=2G
       - SPARK_WORKER_CORES=2
     depends_on:
       - spark-master
     volumes:
-      - spark-data:/opt/bitnami/spark/data
+      - spark-data:/opt/spark/work-dir
       - ../:/app
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
     networks:
       - spark-network
 
   # Test runner container with Python environment
   test-runner:
-    image: bitnami/spark:3.5.0
+    image: python:3.11-slim
     container_name: test-runner
     hostname: test-runner
     environment:
-      - SPARK_MODE=client
       - SPARK_MASTER_URL=spark://spark-master:7077
+      - PYSPARK_PYTHON=python3
+      - PYSPARK_DRIVER_PYTHON=python3
       # API keys passed from host environment
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
@@ -71,7 +69,6 @@ services:
       - spark-worker-1
       - spark-worker-2
     volumes:
-      - spark-data:/opt/bitnami/spark/data
       - ../:/app
     working_dir: /app
     command: tail -f /dev/null  # Keep container running

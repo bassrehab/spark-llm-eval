@@ -61,7 +61,8 @@ def spark_session():
 
     master = get_spark_master()
 
-    spark = (
+    # Configure Delta Lake with proper JARs and extensions
+    builder = (
         SparkSession.builder
         .appName("spark-llm-eval-integration-tests")
         .master(master)
@@ -70,8 +71,19 @@ def spark_session():
         .config("spark.executor.memory", "2g")
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
         .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
-        .getOrCreate()
     )
+
+    # Try to use delta-spark's configure method if available (adds JARs)
+    try:
+        from delta import configure_spark_with_delta_pip
+        spark = configure_spark_with_delta_pip(builder).getOrCreate()
+    except ImportError:
+        # Fallback: add JARs manually
+        spark = (
+            builder
+            .config("spark.jars.packages", "io.delta:delta-spark_2.12:3.0.0")
+            .getOrCreate()
+        )
 
     # Set log level to reduce noise
     spark.sparkContext.setLogLevel("WARN")
