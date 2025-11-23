@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  spark-master:
+    image: bitnami/spark:3.5.0
+    container_name: spark-master
+    hostname: spark-master
+    environment:
+      - SPARK_MODE=master
+      - SPARK_MASTER_HOST=spark-master
+      - SPARK_MASTER_PORT=7077
+      - SPARK_MASTER_WEBUI_PORT=8080
+    ports:
+      - "8080:8080"   # Spark Master Web UI
+      - "7077:7077"   # Spark Master port
+      - "4040:4040"   # Spark Application UI
+    volumes:
+      - spark-data:/opt/bitnami/spark/data
+      - ../:/app
+    networks:
+      - spark-network
+
+  spark-worker-1:
+    image: bitnami/spark:3.5.0
+    container_name: spark-worker-1
+    hostname: spark-worker-1
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=2G
+      - SPARK_WORKER_CORES=2
+    depends_on:
+      - spark-master
+    volumes:
+      - spark-data:/opt/bitnami/spark/data
+      - ../:/app
+    networks:
+      - spark-network
+
+  spark-worker-2:
+    image: bitnami/spark:3.5.0
+    container_name: spark-worker-2
+    hostname: spark-worker-2
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=2G
+      - SPARK_WORKER_CORES=2
+    depends_on:
+      - spark-master
+    volumes:
+      - spark-data:/opt/bitnami/spark/data
+      - ../:/app
+    networks:
+      - spark-network
+
+  # Test runner container with Python environment
+  test-runner:
+    image: bitnami/spark:3.5.0
+    container_name: test-runner
+    hostname: test-runner
+    environment:
+      - SPARK_MODE=client
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      # API keys passed from host environment
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+    depends_on:
+      - spark-master
+      - spark-worker-1
+      - spark-worker-2
+    volumes:
+      - spark-data:/opt/bitnami/spark/data
+      - ../:/app
+    working_dir: /app
+    command: tail -f /dev/null  # Keep container running
+    networks:
+      - spark-network
+
+volumes:
+  spark-data:
+    driver: local
+
+networks:
+  spark-network:
+    driver: bridge
