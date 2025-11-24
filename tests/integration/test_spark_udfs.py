@@ -6,7 +6,20 @@ Run with: pytest tests/integration/test_spark_udfs.py -v
 
 import pytest
 from pyspark.sql import functions as F
-from pyspark.sql.types import StringType
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType, FloatType
+
+from spark_llm_eval.core.config import ModelConfig, ModelProvider, InferenceConfig
+
+# Output schema for inference results (matches batch_udf.py)
+INFERENCE_OUTPUT_SCHEMA = StructType([
+    StructField("request_id", StringType(), False),
+    StructField("response_text", StringType(), True),
+    StructField("input_tokens", IntegerType(), True),
+    StructField("output_tokens", IntegerType(), True),
+    StructField("latency_ms", FloatType(), True),
+    StructField("cost_usd", FloatType(), True),
+    StructField("error", StringType(), True),
+])
 
 
 class TestSparkDistributedInference:
@@ -22,26 +35,39 @@ class TestSparkDistributedInference:
         # Repartition to ensure work is distributed
         df = sample_qa_df.repartition(2)
 
-        # Create UDF
-        inference_udf = create_inference_udf(
-            model_config=openai_config,
+        # Override max_tokens for this test
+        model_config = ModelConfig(
+            provider=openai_config.provider,
+            model_name=openai_config.model_name,
+            api_key_secret=openai_config.api_key_secret,
             max_tokens=50,
             temperature=0.0,
         )
+        inference_config = InferenceConfig(batch_size=5)
 
-        # Apply inference
-        result_df = df.withColumn(
-            "response",
-            inference_udf(F.col("question"))
+        # Create UDF
+        inference_udf = create_inference_udf(
+            model_config=model_config,
+            inference_config=inference_config,
         )
+
+        # Prepare input - UDF expects request_id and prompt columns
+        df_input = df.withColumn(
+            "request_id", F.monotonically_increasing_id().cast("string")
+        ).withColumn(
+            "prompt", F.col("question")
+        ).select("request_id", "prompt")
+
+        # Apply inference using mapInPandas
+        result_df = df_input.mapInPandas(inference_udf, schema=INFERENCE_OUTPUT_SCHEMA)
 
         # Collect results
         results = result_df.collect()
 
         assert len(results) == 10
         for row in results:
-            assert row.response is not None
-            assert len(row.response) > 0
+            assert row.response_text is not None
+            assert len(row.response_text) > 0
 
     @pytest.mark.google
     @pytest.mark.expensive
@@ -53,26 +79,39 @@ class TestSparkDistributedInference:
         # Repartition to ensure work is distributed
         df = sample_qa_df.repartition(2)
 
-        # Create UDF
-        inference_udf = create_inference_udf(
-            model_config=google_config,
+        # Override max_tokens for this test
+        model_config = ModelConfig(
+            provider=google_config.provider,
+            model_name=google_config.model_name,
+            api_key_secret=google_config.api_key_secret,
             max_tokens=50,
             temperature=0.0,
         )
+        inference_config = InferenceConfig(batch_size=5)
 
-        # Apply inference
-        result_df = df.withColumn(
-            "response",
-            inference_udf(F.col("question"))
+        # Create UDF
+        inference_udf = create_inference_udf(
+            model_config=model_config,
+            inference_config=inference_config,
         )
+
+        # Prepare input - UDF expects request_id and prompt columns
+        df_input = df.withColumn(
+            "request_id", F.monotonically_increasing_id().cast("string")
+        ).withColumn(
+            "prompt", F.col("question")
+        ).select("request_id", "prompt")
+
+        # Apply inference using mapInPandas
+        result_df = df_input.mapInPandas(inference_udf, schema=INFERENCE_OUTPUT_SCHEMA)
 
         # Collect results
         results = result_df.collect()
 
         assert len(results) == 10
         for row in results:
-            assert row.response is not None
-            assert len(row.response) > 0
+            assert row.response_text is not None
+            assert len(row.response_text) > 0
 
 
 class TestSparkPartitioning:
@@ -88,16 +127,28 @@ class TestSparkPartitioning:
         df = sample_qa_df.coalesce(1)
         assert df.rdd.getNumPartitions() == 1
 
-        inference_udf = create_inference_udf(
-            model_config=openai_config,
+        model_config = ModelConfig(
+            provider=openai_config.provider,
+            model_name=openai_config.model_name,
+            api_key_secret=openai_config.api_key_secret,
             max_tokens=20,
             temperature=0.0,
         )
+        inference_config = InferenceConfig(batch_size=10)
 
-        result_df = df.withColumn(
-            "response",
-            inference_udf(F.col("question"))
+        inference_udf = create_inference_udf(
+            model_config=model_config,
+            inference_config=inference_config,
         )
+
+        # Prepare input
+        df_input = df.withColumn(
+            "request_id", F.monotonically_increasing_id().cast("string")
+        ).withColumn(
+            "prompt", F.col("question")
+        ).select("request_id", "prompt")
+
+        result_df = df_input.mapInPandas(inference_udf, schema=INFERENCE_OUTPUT_SCHEMA)
 
         results = result_df.collect()
         assert len(results) == 10
@@ -112,16 +163,28 @@ class TestSparkPartitioning:
         df = sample_qa_df.repartition(10)
         assert df.rdd.getNumPartitions() == 10
 
-        inference_udf = create_inference_udf(
-            model_config=openai_config,
+        model_config = ModelConfig(
+            provider=openai_config.provider,
+            model_name=openai_config.model_name,
+            api_key_secret=openai_config.api_key_secret,
             max_tokens=20,
             temperature=0.0,
         )
+        inference_config = InferenceConfig(batch_size=1)
 
-        result_df = df.withColumn(
-            "response",
-            inference_udf(F.col("question"))
+        inference_udf = create_inference_udf(
+            model_config=model_config,
+            inference_config=inference_config,
         )
+
+        # Prepare input
+        df_input = df.withColumn(
+            "request_id", F.monotonically_increasing_id().cast("string")
+        ).withColumn(
+            "prompt", F.col("question")
+        ).select("request_id", "prompt")
+
+        result_df = df_input.mapInPandas(inference_udf, schema=INFERENCE_OUTPUT_SCHEMA)
 
         results = result_df.collect()
         assert len(results) == 10
@@ -141,16 +204,28 @@ class TestErrorHandling:
             {"question": "What is 2+2?"},
         ])
 
-        inference_udf = create_inference_udf(
-            model_config=openai_config,
+        model_config = ModelConfig(
+            provider=openai_config.provider,
+            model_name=openai_config.model_name,
+            api_key_secret=openai_config.api_key_secret,
             max_tokens=20,
             temperature=0.0,
         )
+        inference_config = InferenceConfig(batch_size=2)
 
-        result_df = df.withColumn(
-            "response",
-            inference_udf(F.col("question"))
+        inference_udf = create_inference_udf(
+            model_config=model_config,
+            inference_config=inference_config,
         )
+
+        # Prepare input
+        df_input = df.withColumn(
+            "request_id", F.monotonically_increasing_id().cast("string")
+        ).withColumn(
+            "prompt", F.col("question")
+        ).select("request_id", "prompt")
+
+        result_df = df_input.mapInPandas(inference_udf, schema=INFERENCE_OUTPUT_SCHEMA)
 
         results = result_df.collect()
         assert len(results) == 2
@@ -162,31 +237,51 @@ class TestPromptTemplates:
     @pytest.mark.openai
     @pytest.mark.expensive
     def test_prompt_template(self, spark_session, openai_config):
-        """Test that prompt templates are rendered correctly."""
+        """Test that prompt templates are rendered correctly via pre-processing."""
         from spark_llm_eval.inference import create_inference_udf
+        from pyspark.sql.functions import concat, lit
 
         df = spark_session.createDataFrame([
             {"question": "France", "context": "capital cities"},
             {"question": "Germany", "context": "capital cities"},
         ])
 
-        inference_udf = create_inference_udf(
-            model_config=openai_config,
+        model_config = ModelConfig(
+            provider=openai_config.provider,
+            model_name=openai_config.model_name,
+            api_key_secret=openai_config.api_key_secret,
             max_tokens=20,
             temperature=0.0,
-            prompt_template="Answer about {{ context }}: What is the capital of {{ input }}? Answer in one word.",
+        )
+        inference_config = InferenceConfig(batch_size=2)
+
+        inference_udf = create_inference_udf(
+            model_config=model_config,
+            inference_config=inference_config,
         )
 
-        result_df = df.withColumn(
-            "response",
-            inference_udf(F.col("question"))
-        )
+        # Build prompt using Spark SQL functions (template rendering via DataFrame)
+        df_input = df.withColumn(
+            "prompt",
+            concat(
+                lit("Answer about "),
+                F.col("context"),
+                lit(": What is the capital of "),
+                F.col("question"),
+                lit("? Answer in one word.")
+            )
+        ).withColumn(
+            "request_id", F.monotonically_increasing_id().cast("string")
+        ).select("request_id", "prompt")
+
+        result_df = df_input.mapInPandas(inference_udf, schema=INFERENCE_OUTPUT_SCHEMA)
 
         results = result_df.collect()
         assert len(results) == 2
         # Should contain city names
-        assert any("Paris" in r.response for r in results)
-        assert any("Berlin" in r.response for r in results)
+        responses = [r.response_text.lower() for r in results if r.response_text]
+        assert any("paris" in r for r in responses)
+        assert any("berlin" in r for r in responses)
 
 
 class TestRateLimiting:
@@ -202,20 +297,34 @@ class TestRateLimiting:
 
         df = sample_qa_df.repartition(2)
 
-        # Create UDF with strict rate limiting
-        inference_udf = create_inference_udf(
-            model_config=openai_config,
+        model_config = ModelConfig(
+            provider=openai_config.provider,
+            model_name=openai_config.model_name,
+            api_key_secret=openai_config.api_key_secret,
             max_tokens=20,
             temperature=0.0,
+        )
+        # Create config with strict rate limiting
+        inference_config = InferenceConfig(
+            batch_size=5,
             rate_limit_rpm=30,  # Low rate limit
+        )
+
+        inference_udf = create_inference_udf(
+            model_config=model_config,
+            inference_config=inference_config,
         )
 
         start_time = time.time()
 
-        result_df = df.withColumn(
-            "response",
-            inference_udf(F.col("question"))
-        )
+        # Prepare input
+        df_input = df.withColumn(
+            "request_id", F.monotonically_increasing_id().cast("string")
+        ).withColumn(
+            "prompt", F.col("question")
+        ).select("request_id", "prompt")
+
+        result_df = df_input.mapInPandas(inference_udf, schema=INFERENCE_OUTPUT_SCHEMA)
 
         results = result_df.collect()
         elapsed = time.time() - start_time
@@ -223,7 +332,7 @@ class TestRateLimiting:
         # All requests should complete without rate limit errors
         assert len(results) == 10
         for row in results:
-            assert row.response is not None
+            assert row.response_text is not None
 
         # With 10 requests at 30 RPM, should take at least some time
         # (though this depends on actual timing)

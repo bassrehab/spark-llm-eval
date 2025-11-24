@@ -56,10 +56,12 @@ def spark_session():
     """Create a Spark session for integration tests.
 
     Uses Docker cluster if SPARK_MASTER is set, otherwise local mode.
+    Enables event logging for Spark History Server.
     """
     from pyspark.sql import SparkSession
 
     master = get_spark_master()
+    event_log_dir = os.environ.get("SPARK_EVENTLOG_DIR", "/tmp/spark-events")
 
     # Configure Delta Lake with proper JARs and extensions
     builder = (
@@ -71,6 +73,9 @@ def spark_session():
         .config("spark.executor.memory", "2g")
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
         .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
+        # Enable event logging for Spark History Server
+        .config("spark.eventLog.enabled", "true")
+        .config("spark.eventLog.dir", event_log_dir)
     )
 
     # Try to use delta-spark's configure method if available (adds JARs)
@@ -91,6 +96,21 @@ def spark_session():
     yield spark
 
     spark.stop()
+
+
+@pytest.fixture(scope="session")
+def mlflow_tracking():
+    """Set up MLflow tracking if available."""
+    tracking_uri = os.environ.get("MLFLOW_TRACKING_URI")
+    if tracking_uri:
+        try:
+            import mlflow
+            mlflow.set_tracking_uri(tracking_uri)
+            mlflow.set_experiment("spark-llm-eval-integration-tests")
+            return mlflow
+        except ImportError:
+            pass
+    return None
 
 
 @pytest.fixture(scope="session")

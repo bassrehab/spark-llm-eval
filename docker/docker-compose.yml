@@ -1,6 +1,9 @@
 services:
   spark-master:
-    image: apache/spark:3.5.0
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: spark-llm-eval:3.5.0-py311
     container_name: spark-master
     hostname: spark-master
     environment:
@@ -8,19 +11,25 @@ services:
       - SPARK_MASTER_HOST=spark-master
       - SPARK_MASTER_PORT=7077
       - SPARK_MASTER_WEBUI_PORT=8080
+      - SPARK_HISTORY_OPTS=-Dspark.history.fs.logDirectory=/opt/spark/spark-events
     ports:
       - "8080:8080"   # Spark Master Web UI
       - "7077:7077"   # Spark Master port
       - "4040:4040"   # Spark Application UI
     volumes:
       - spark-data:/opt/spark/work-dir
+      - spark-events:/opt/spark/spark-events
       - ../:/app
-    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+    entrypoint: >
+      bash -c "mkdir -p /opt/spark/spark-events && /opt/spark/sbin/start-master.sh && tail -f /dev/null"
     networks:
       - spark-network
 
   spark-worker-1:
-    image: apache/spark:3.5.0
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: spark-llm-eval:3.5.0-py311
     container_name: spark-worker-1
     hostname: spark-worker-1
     environment:
@@ -30,13 +39,18 @@ services:
       - spark-master
     volumes:
       - spark-data:/opt/spark/work-dir
+      - spark-events:/opt/spark/spark-events
       - ../:/app
-    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    entrypoint: >
+      bash -c "sleep 5 && /opt/spark/sbin/start-worker.sh spark://spark-master:7077 && tail -f /dev/null"
     networks:
       - spark-network
 
   spark-worker-2:
-    image: apache/spark:3.5.0
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: spark-llm-eval:3.5.0-py311
     container_name: spark-worker-2
     hostname: spark-worker-2
     environment:
@@ -46,20 +60,66 @@ services:
       - spark-master
     volumes:
       - spark-data:/opt/spark/work-dir
+      - spark-events:/opt/spark/spark-events
       - ../:/app
-    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    entrypoint: >
+      bash -c "sleep 5 && /opt/spark/sbin/start-worker.sh spark://spark-master:7077 && tail -f /dev/null"
     networks:
       - spark-network
 
-  # Test runner container with Python environment
-  test-runner:
+  # Spark History Server - view completed job history
+  spark-history:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: spark-llm-eval:3.5.0-py311
+    container_name: spark-history
+    hostname: spark-history
+    environment:
+      - SPARK_HISTORY_OPTS=-Dspark.history.fs.logDirectory=/opt/spark/spark-events
+    ports:
+      - "18080:18080"  # Spark History Server UI
+    volumes:
+      - spark-events:/opt/spark/spark-events
+    depends_on:
+      - spark-master
+    entrypoint: >
+      bash -c "mkdir -p /opt/spark/spark-events && /opt/spark/sbin/start-history-server.sh && tail -f /dev/null"
+    networks:
+      - spark-network
+
+  # MLflow Tracking Server
+  mlflow:
     image: python:3.11-slim
+    container_name: mlflow
+    hostname: mlflow
+    ports:
+      - "5001:5000"   # MLflow UI (5001 to avoid macOS AirPlay conflict)
+    volumes:
+      - mlflow-data:/mlflow
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+    command: >
+      bash -c "pip install -q 'mlflow<3' && mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///mlflow/mlflow.db --default-artifact-root /mlflow/artifacts"
+    networks:
+      - spark-network
+
+  # Test runner container - same image ensures Python version match
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: spark-llm-eval:3.5.0-py311
     container_name: test-runner
     hostname: test-runner
     environment:
       - SPARK_MASTER_URL=spark://spark-master:7077
       - PYSPARK_PYTHON=python3
       - PYSPARK_DRIVER_PYTHON=python3
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      # Spark event logging for history server
+      - SPARK_EVENTLOG_ENABLED=true
+      - SPARK_EVENTLOG_DIR=/opt/spark/spark-events
       # API keys passed from host environment
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
@@ -68,7 +128,10 @@ services:
       - spark-master
       - spark-worker-1
       - spark-worker-2
+      - spark-history
+      - mlflow
     volumes:
+      - spark-events:/opt/spark/spark-events
       - ../:/app
     working_dir: /app
     command: tail -f /dev/null  # Keep container running
@@ -77,6 +140,10 @@ services:
 
 volumes:
   spark-data:
+    driver: local
+  spark-events:
+    driver: local
+  mlflow-data:
     driver: local
 
 networks:

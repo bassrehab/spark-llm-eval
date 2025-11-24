@@ -2,11 +2,32 @@
 
 This guide explains how to set up and run integration tests for spark-llm-eval using a local Docker-based Apache Spark cluster.
 
+## Architecture
+
+The Docker setup includes:
+- **Spark Master** - Coordinates the cluster
+- **Spark Workers (2)** - Execute distributed tasks
+- **Spark History Server** - View completed job history
+- **MLflow Tracking Server** - Experiment tracking and model registry
+- **Test Runner** - Executes integration tests
+
+All containers use a custom image with Python 3.11 to ensure version consistency.
+
+## Web UIs
+
+After starting the cluster, these UIs are available:
+
+| Service | URL | Description |
+|---------|-----|-------------|
+| Spark Master | http://localhost:8080 | Cluster overview, workers, running apps |
+| Spark History | http://localhost:18080 | Completed job history and details |
+| MLflow | http://localhost:5001 | Experiment tracking, model registry |
+| Spark App UI | http://localhost:4040 | Active job details (during execution) |
+
 ## Prerequisites
 
 - **Docker Desktop** (v4.0+) with at least 8GB RAM allocated
 - **Docker Compose** (v2.0+)
-- **Python 3.10+**
 - **API Keys** for LLM providers (see below)
 
 ## Obtaining API Keys
@@ -74,12 +95,32 @@ pip install openai anthropic google-generativeai
 
 ## Starting the Spark Cluster
 
-### 1. Start the Cluster
+### Quick Start (Recommended)
+
+The easiest way to run tests is using the provided script:
+
+```bash
+cd docker
+./run-integration-tests.sh
+```
+
+This script will:
+1. Build the custom Spark image (first time only)
+2. Start all services (master, workers, history server, MLflow)
+3. Run all integration tests
+4. Display links to web UIs
+
+### Manual Start
+
+If you prefer to start the cluster manually:
 
 ```bash
 cd docker
 
-# Start all services (detached mode)
+# Build the custom image (first time)
+docker-compose build
+
+# Start all services
 docker-compose up -d
 
 # Verify all containers are running
@@ -92,24 +133,32 @@ NAME             STATUS    PORTS
 spark-master    running   0.0.0.0:7077->7077/tcp, 0.0.0.0:8080->8080/tcp
 spark-worker-1  running
 spark-worker-2  running
+spark-history   running   0.0.0.0:18080->18080/tcp
+mlflow          running   0.0.0.0:5000->5000/tcp
 test-runner     running
 ```
 
-### 2. Verify Spark Cluster
+### Verify the Cluster
 
-Open [http://localhost:8080](http://localhost:8080) in your browser to see the Spark Master UI.
+1. **Spark Master UI**: Open http://localhost:8080
+   - Should show 2 workers registered
+   - Each worker with 2 cores and 2GB memory
 
-You should see:
-- 2 workers registered
-- Each worker with 2 cores and 2GB memory
+2. **Spark History Server**: Open http://localhost:18080
+   - Shows completed Spark applications
+   - Click on an app to see job details, stages, tasks
 
-### 3. Test Spark Connectivity
+3. **MLflow UI**: Open http://localhost:5000
+   - Shows experiment runs
+   - View metrics, parameters, artifacts
+
+### Test Spark Connectivity
 
 ```bash
 # Enter the test-runner container
 docker exec -it test-runner bash
 
-# Test PySpark
+# Test PySpark connection to cluster
 python3 -c "
 from pyspark.sql import SparkSession
 spark = SparkSession.builder \
@@ -201,7 +250,7 @@ TEST_SAMPLE_SIZE = 10
 TEST_MODELS = {
     "openai": "gpt-4o-mini",      # Cheapest OpenAI
     "anthropic": "claude-3-haiku-20240307",  # Cheapest Claude
-    "google": "gemini-1.5-flash", # Free tier available
+    "google": "gemini-2.0-flash", # Free tier available
 }
 
 # Skip expensive tests
