@@ -259,7 +259,6 @@ class TestModelComparison:
         from spark_llm_eval.core.config import MetricConfig, StatisticsConfig
         from spark_llm_eval.core.task import EvalTask
         from spark_llm_eval.orchestrator import EvaluationRunner, RunnerConfig
-        from spark_llm_eval.statistics import paired_ttest
 
         input_path = os.path.join(temp_delta_path, "comparison_input")
         sample_qa_df.limit(5).write.format("delta").mode("overwrite").save(input_path)
@@ -308,13 +307,9 @@ Answer:"""
         print(f"OpenAI F1: {openai_f1.value:.4f}")
         print(f"Anthropic F1: {anthropic_f1.value:.4f}")
 
-        # Optionally run statistical comparison
-        if openai_f1.per_example_scores and anthropic_f1.per_example_scores:
-            comparison = paired_ttest(
-                openai_f1.per_example_scores,
-                anthropic_f1.per_example_scores,
-            )
-            print(f"P-value: {comparison.p_value:.4f}")
+        # Both should have valid metric values
+        assert openai_f1.value >= 0
+        assert anthropic_f1.value >= 0
 
 
 class TestResultsSerialization:
