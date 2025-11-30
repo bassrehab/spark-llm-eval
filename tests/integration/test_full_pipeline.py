@@ -16,7 +16,7 @@ class TestFullEvaluationPipeline:
     @pytest.mark.slow
     def test_full_qa_evaluation_openai(self, spark_session, sample_qa_df, openai_config, temp_delta_path):
         """Test complete QA evaluation with OpenAI."""
-        from spark_llm_eval.core.config import MetricConfig, StatisticsConfig
+        from spark_llm_eval.core.config import MetricConfig, StatisticsConfig, OutputConfig
         from spark_llm_eval.core.task import EvalTask
         from spark_llm_eval.orchestrator import EvaluationRunner, RunnerConfig
 
@@ -35,9 +35,11 @@ class TestFullEvaluationPipeline:
             model_config=openai_config,
             prompt_template="""Answer the following question concisely in a few words.
 
-Question: {{ input }}
+Question: {{ question }}
 
 Answer:""",
+            input_column="question",
+            reference_column="answer",
             metrics=[
                 MetricConfig(name="exact_match"),
                 MetricConfig(name="f1"),
@@ -51,9 +53,9 @@ Answer:""",
             metrics=task.metrics,
             statistics_config=StatisticsConfig(
                 confidence_level=0.95,
-                bootstrap_iterations=100,  # Fewer iterations for speed
+                bootstrap_iterations=100,
             ),
-            output_path=output_path,
+            output_config=OutputConfig(results_path=output_path, save_results=True),
         )
 
         # Run evaluation
@@ -82,7 +84,7 @@ Answer:""",
     @pytest.mark.slow
     def test_full_qa_evaluation_anthropic(self, spark_session, sample_qa_df, anthropic_config, temp_delta_path):
         """Test complete QA evaluation with Anthropic Claude."""
-        from spark_llm_eval.core.config import MetricConfig, StatisticsConfig
+        from spark_llm_eval.core.config import MetricConfig, StatisticsConfig, OutputConfig
         from spark_llm_eval.core.task import EvalTask
         from spark_llm_eval.orchestrator import EvaluationRunner, RunnerConfig
 
@@ -101,9 +103,11 @@ Answer:""",
             model_config=anthropic_config,
             prompt_template="""Answer the following question concisely in a few words.
 
-Question: {{ input }}
+Question: {{ question }}
 
 Answer:""",
+            input_column="question",
+            reference_column="answer",
             metrics=[
                 MetricConfig(name="exact_match"),
                 MetricConfig(name="f1"),
@@ -118,7 +122,7 @@ Answer:""",
                 confidence_level=0.95,
                 bootstrap_iterations=100,
             ),
-            output_path=output_path,
+            output_config=OutputConfig(results_path=output_path, save_results=True),
         )
 
         # Run evaluation
@@ -138,7 +142,7 @@ Answer:""",
     @pytest.mark.slow
     def test_full_qa_evaluation_gemini(self, spark_session, sample_qa_df, google_config, temp_delta_path):
         """Test complete QA evaluation with Google Gemini."""
-        from spark_llm_eval.core.config import MetricConfig, StatisticsConfig
+        from spark_llm_eval.core.config import MetricConfig, StatisticsConfig, OutputConfig
         from spark_llm_eval.core.task import EvalTask
         from spark_llm_eval.orchestrator import EvaluationRunner, RunnerConfig
 
@@ -157,9 +161,11 @@ Answer:""",
             model_config=google_config,
             prompt_template="""Answer the following question concisely in a few words.
 
-Question: {{ input }}
+Question: {{ question }}
 
 Answer:""",
+            input_column="question",
+            reference_column="answer",
             metrics=[
                 MetricConfig(name="exact_match"),
                 MetricConfig(name="f1"),
@@ -174,7 +180,7 @@ Answer:""",
                 confidence_level=0.95,
                 bootstrap_iterations=100,
             ),
-            output_path=output_path,
+            output_config=OutputConfig(results_path=output_path, save_results=True),
         )
 
         # Run evaluation
@@ -209,7 +215,9 @@ class TestMetricsComputation:
             name="Lexical Metrics Test",
             dataset_path=input_path,
             model_config=openai_config,
-            prompt_template="Answer: {{ input }}",
+            prompt_template="Answer: {{ question }}",
+            input_column="question",
+            reference_column="answer",
             metrics=[
                 MetricConfig(name="exact_match"),
                 MetricConfig(name="f1"),
@@ -223,7 +231,7 @@ class TestMetricsComputation:
         runner_config = RunnerConfig(
             model_config=openai_config,
             metrics=task.metrics,
-            statistics_config=StatisticsConfig(bootstrap_iterations=50),
+            statistics_config=StatisticsConfig(bootstrap_iterations=100),
         )
 
         runner = EvaluationRunner(spark_session, runner_config)
@@ -257,11 +265,11 @@ class TestModelComparison:
         sample_qa_df.limit(5).write.format("delta").mode("overwrite").save(input_path)
 
         prompt_template = """Answer the question concisely.
-Question: {{ input }}
+Question: {{ question }}
 Answer:"""
 
         metrics = [MetricConfig(name="f1")]
-        stats_config = StatisticsConfig(bootstrap_iterations=50)
+        stats_config = StatisticsConfig(bootstrap_iterations=100)
 
         results = {}
 
@@ -272,6 +280,8 @@ Answer:"""
                 dataset_path=input_path,
                 model_config=config,
                 prompt_template=prompt_template,
+                input_column="question",
+                reference_column="answer",
                 metrics=metrics,
             )
 
@@ -314,7 +324,7 @@ class TestResultsSerialization:
     @pytest.mark.expensive
     def test_results_to_dataframe(self, spark_session, sample_qa_df, openai_config, temp_delta_path):
         """Test converting results to DataFrame for storage."""
-        from spark_llm_eval.core.config import MetricConfig, StatisticsConfig
+        from spark_llm_eval.core.config import MetricConfig, StatisticsConfig, OutputConfig
         from spark_llm_eval.core.task import EvalTask
         from spark_llm_eval.orchestrator import EvaluationRunner, RunnerConfig
 
@@ -328,15 +338,17 @@ class TestResultsSerialization:
             name="Serialization Test",
             dataset_path=input_path,
             model_config=openai_config,
-            prompt_template="Answer: {{ input }}",
+            prompt_template="Answer: {{ question }}",
+            input_column="question",
+            reference_column="answer",
             metrics=[MetricConfig(name="f1")],
         )
 
         runner_config = RunnerConfig(
             model_config=openai_config,
             metrics=task.metrics,
-            statistics_config=StatisticsConfig(bootstrap_iterations=50),
-            output_path=output_path,
+            statistics_config=StatisticsConfig(bootstrap_iterations=100),
+            output_config=OutputConfig(results_path=output_path, save_results=True),
         )
 
         runner = EvaluationRunner(spark_session, runner_config)
@@ -355,7 +367,7 @@ class TestResultsSerialization:
 
         # Create DataFrame and save
         result_df = spark_session.createDataFrame([result_dict])
-        result_df.write.format("delta").mode("overwrite").save(output_path)
+        result_df.write.format("delta").mode("overwrite").option("overwriteSchema", "true").save(output_path)
 
         # Read back
         loaded_df = spark_session.read.format("delta").load(output_path)

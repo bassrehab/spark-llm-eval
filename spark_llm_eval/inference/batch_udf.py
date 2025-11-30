@@ -71,8 +71,8 @@ def _create_engine(model_config: dict, inference_config: dict) -> InferenceEngin
         from spark_llm_eval.inference.openai_engine import OpenAIInferenceEngine
         engine = OpenAIInferenceEngine(mc, ic)
     elif provider == ModelProvider.ANTHROPIC:
-        from spark_llm_eval.inference.anthropic_engine import AnthropicInferenceEngine
-        engine = AnthropicInferenceEngine(mc, ic)
+        from spark_llm_eval.inference.anthropic_engine import AnthropicEngine
+        engine = AnthropicEngine(mc, ic)
     elif provider == ModelProvider.GOOGLE:
         from spark_llm_eval.inference.gemini_engine import GeminiEngine
         engine = GeminiEngine(mc, ic)
