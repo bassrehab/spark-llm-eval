@@ -34,11 +34,23 @@ Current LLM evaluation tools are designed for single-machine execution. When you
 
 ## Installation
 
+### PyPI (Recommended)
+
 ```bash
 pip install spark-llm-eval
 ```
 
-For development:
+### Databricks
+
+In a Databricks notebook:
+```python
+%pip install spark-llm-eval
+```
+
+Or attach to your cluster via the Libraries UI using PyPI coordinates: `spark-llm-eval`
+
+### Development
+
 ```bash
 git clone https://github.com/bassrehab/spark-llm-eval.git
 cd spark-llm-eval
@@ -219,6 +231,7 @@ black --check spark_llm_eval
 
 ## Roadmap
 
+### Completed
 - [x] Core framework with OpenAI support
 - [x] Lexical metrics with statistical rigor
 - [x] MLflow integration
@@ -226,9 +239,18 @@ black --check spark_llm_eval
 - [x] Multi-provider support (Anthropic, Google Gemini)
 - [x] Semantic metrics (BERTScore, embeddings)
 - [x] LLM-as-judge
-- [ ] Agent and RAG evaluation
+- [x] Agent evaluation (trajectories, tool use, multi-agent debate)
+
+### In Progress
+- [ ] RAG evaluation metrics (context relevance, faithfulness)
+- [ ] Databricks notebook examples
+- [ ] PyPI package release
+
+### Planned
 - [ ] vLLM/local model support
+- [ ] Response caching (Delta-backed)
 - [ ] Unity Catalog integration
+- [ ] Databricks Asset Bundle distribution
 
 ## License
 
