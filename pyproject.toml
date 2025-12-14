@@ -7,7 +7,7 @@ name = "spark-llm-eval"
 version = "0.1.0"
 description = "Distributed LLM evaluation framework for Apache Spark"
 readme = "README.md"
-license = {text = "Apache-2.0"}
+license = "Apache-2.0"
 authors = [
     {name = "Subhadip Mitra", email = "contact@subhadipmitra.com"}
 ]
@@ -28,7 +28,6 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
@@ -47,6 +46,7 @@ dependencies = [
     "scipy>=1.11.0",
     "openai>=1.0.0",
     "anthropic>=0.18.0",
+    "google-generativeai>=0.3.0",
     "tiktoken>=0.5.0",
     "jinja2>=3.1.0",
     "rouge-score>=0.1.2",
