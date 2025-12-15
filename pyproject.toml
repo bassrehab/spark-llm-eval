@@ -73,7 +73,7 @@ all = [
 
 [project.urls]
 Homepage = "https://github.com/bassrehab/spark-llm-eval"
-Documentation = "https://spark-llm-eval.readthedocs.io"
+Documentation = "https://github.com/bassrehab/spark-llm-eval#readme"
 Repository = "https://github.com/bassrehab/spark-llm-eval"
 Issues = "https://github.com/bassrehab/spark-llm-eval/issues"
 
