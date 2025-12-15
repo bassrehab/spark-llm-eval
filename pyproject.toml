@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "spark-llm-eval"
-version = "0.1.0"
+version = "0.1.1"
 description = "Distributed LLM evaluation framework for Apache Spark"
 readme = "README.md"
 license = "Apache-2.0"
