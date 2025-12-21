@@ -139,6 +139,16 @@ for name, metric in result.metrics.items():
 - **pairwise_comparison**: Compare two outputs head-to-head
 - **pointwise_grading**: Score individual outputs on defined criteria
 
+### RAG Metrics
+- **context_relevance**: Is retrieved context relevant to the query?
+- **faithfulness**: Is the answer grounded in context (no hallucinations)?
+- **answer_relevance**: Does the answer address the query?
+- **context_precision**: Ranking quality of retrieved chunks
+- **context_recall**: Coverage of ground truth in retrieved context
+- **context_relevance_embedding**: Embedding-based relevance (faster, cheaper)
+- **answer_relevance_embedding**: Embedding-based relevance (faster, cheaper)
+- **faithfulness_nli**: NLI-based faithfulness (faster, cheaper)
+
 ## Statistical Features
 
 All metrics include:
@@ -241,11 +251,9 @@ black --check spark_llm_eval
 - [x] Semantic metrics (BERTScore, embeddings)
 - [x] LLM-as-judge
 - [x] Agent evaluation (trajectories, tool use, multi-agent debate)
-
-### In Progress
-- [ ] RAG evaluation metrics (context relevance, faithfulness)
-- [ ] Databricks notebook examples
-- [ ] PyPI package release
+- [x] RAG evaluation metrics (context relevance, faithfulness, answer relevance, precision, recall)
+- [x] Databricks notebook examples
+- [x] PyPI package release
 
 ### Planned
 - [ ] vLLM/local model support

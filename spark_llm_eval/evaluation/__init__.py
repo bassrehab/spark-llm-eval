@@ -46,6 +46,31 @@ from spark_llm_eval.evaluation.llm_judge import (
     GEvalMetric,
 )
 
+# RAG evaluation metrics
+from spark_llm_eval.evaluation.rag import (
+    RAGMetric,
+    RAGJudgeConfig,
+    ContextRelevanceMetric,
+    FaithfulnessMetric,
+    AnswerRelevanceMetric,
+    ContextPrecisionMetric,
+    ContextRecallMetric,
+)
+
+# RAG embedding-based metrics (optional dependencies)
+try:
+    from spark_llm_eval.evaluation.rag import (
+        ContextRelevanceEmbeddingMetric,
+        AnswerRelevanceEmbeddingMetric,
+        FaithfulnessNLIMetric,
+    )
+    _HAS_RAG_EMBEDDING = True
+except ImportError:
+    _HAS_RAG_EMBEDDING = False
+    ContextRelevanceEmbeddingMetric = None
+    AnswerRelevanceEmbeddingMetric = None
+    FaithfulnessNLIMetric = None
+
 __all__ = [
     # base
     "Metric",
@@ -76,4 +101,16 @@ __all__ = [
     "LLMJudgeMetric",
     "PairwiseJudgeMetric",
     "GEvalMetric",
+    # RAG metrics
+    "RAGMetric",
+    "RAGJudgeConfig",
+    "ContextRelevanceMetric",
+    "FaithfulnessMetric",
+    "AnswerRelevanceMetric",
+    "ContextPrecisionMetric",
+    "ContextRecallMetric",
+    # RAG embedding metrics (optional)
+    "ContextRelevanceEmbeddingMetric",
+    "AnswerRelevanceEmbeddingMetric",
+    "FaithfulnessNLIMetric",
 ]

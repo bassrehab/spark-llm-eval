@@ -195,16 +195,38 @@ class EvaluationRunner:
         metrics_results = {}
         ref_col = task.reference_column or "reference"
 
+        # Collect base columns
+        predictions = data.select("prediction").rdd.flatMap(lambda x: x).collect()
+        references = data.select(ref_col).rdd.flatMap(lambda x: x).collect()
+
+        # Collect RAG-specific columns for metrics that need them
+        extra_kwargs: Dict[str, Any] = {}
+
+        # Query column (use input_column)
+        if task.input_column in data.columns:
+            extra_kwargs["queries"] = (
+                data.select(task.input_column).rdd.flatMap(lambda x: x).collect()
+            )
+
+        # Context columns
+        if task.context_columns:
+            context_cols = [c for c in task.context_columns if c in data.columns]
+            if len(context_cols) == 1:
+                extra_kwargs["contexts"] = (
+                    data.select(context_cols[0]).rdd.flatMap(lambda x: x).collect()
+                )
+            elif context_cols:
+                # Multiple context columns -> list per example
+                rows = data.select(*context_cols).collect()
+                extra_kwargs["contexts"] = [list(row.asDict().values()) for row in rows]
+
         for metric_config in self.config.metrics:
-            metric = get_metric(metric_config.name)
+            # Pass kwargs to metric constructor
+            metric = get_metric(metric_config.name, **metric_config.kwargs)
 
-            # compute per-example scores
-            # collect to driver for metrics computation
-            # TODO: optimize with UDFs for large datasets
-            predictions = data.select("prediction").rdd.flatMap(lambda x: x).collect()
-            references = data.select(ref_col).rdd.flatMap(lambda x: x).collect()
-
-            result = metric.compute(predictions, references, **metric_config.kwargs)
+            # Merge extra kwargs with metric config kwargs
+            compute_kwargs = {**extra_kwargs, **metric_config.kwargs}
+            result = metric.compute(predictions, references, **compute_kwargs)
 
             if result.per_example_scores:
                 metrics_results[metric_config.name] = result.per_example_scores
