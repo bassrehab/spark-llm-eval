@@ -1,12 +1,12 @@
 """Gemini inference via Google's generativeai SDK."""
 
-import time
 import logging
 import os
+import time
 
-from spark_llm_eval.inference.base import InferenceEngine, InferenceRequest, InferenceResponse
 from spark_llm_eval.core.config import ModelConfig
 from spark_llm_eval.core.exceptions import InferenceError, RateLimitError
+from spark_llm_eval.inference.base import InferenceEngine, InferenceRequest, InferenceResponse
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +15,7 @@ def _import_genai():
     """Import google.generativeai on first use."""
     try:
         import google.generativeai as genai
+
         return genai
     except ImportError:
         raise ImportError("missing google-generativeai, run: pip install google-generativeai")
@@ -55,7 +56,6 @@ class GeminiEngine(InferenceEngine):
 
     def _get_api_key(self) -> str:
         """Get API key from config or environment."""
-        import os
 
         # check explicit api_key first (for testing)
         if self._api_key:
@@ -70,12 +70,15 @@ class GeminiEngine(InferenceEngine):
             # try Databricks secrets if available
             try:
                 from pyspark.sql import SparkSession
+
                 spark = SparkSession.getActiveSession()
                 if spark:
                     parts = self.config.api_key_secret.split("/")
                     if len(parts) == 2:
                         scope, key_name = parts
-                        return spark._jvm.com.databricks.service.DBUtils.secrets().get(scope, key_name)
+                        return spark._jvm.com.databricks.service.DBUtils.secrets().get(
+                            scope, key_name
+                        )
             except Exception:
                 pass
 
@@ -144,9 +147,9 @@ class GeminiEngine(InferenceEngine):
             # get token counts from usage metadata
             input_tokens = 0
             output_tokens = 0
-            if hasattr(response, 'usage_metadata') and response.usage_metadata:
-                input_tokens = getattr(response.usage_metadata, 'prompt_token_count', 0)
-                output_tokens = getattr(response.usage_metadata, 'candidates_token_count', 0)
+            if hasattr(response, "usage_metadata") and response.usage_metadata:
+                input_tokens = getattr(response.usage_metadata, "prompt_token_count", 0)
+                output_tokens = getattr(response.usage_metadata, "candidates_token_count", 0)
 
             # track tokens
             self._total_input_tokens += input_tokens
@@ -160,7 +163,7 @@ class GeminiEngine(InferenceEngine):
             finish_reason = "stop"
             if response.candidates:
                 candidate = response.candidates[0]
-                if hasattr(candidate, 'finish_reason'):
+                if hasattr(candidate, "finish_reason"):
                     finish_reason = str(candidate.finish_reason.name).lower()
 
             return InferenceResponse(
@@ -206,16 +209,18 @@ class GeminiEngine(InferenceEngine):
             except Exception as e:
                 logger.error(f"Batch inference failed for request: {e}")
                 # return error response
-                responses.append(InferenceResponse(
-                    text="",
-                    input_tokens=0,
-                    output_tokens=0,
-                    latency_ms=0,
-                    cost_usd=0,
-                    model=self.config.model_name,
-                    finish_reason="error",
-                    error=str(e),
-                ))
+                responses.append(
+                    InferenceResponse(
+                        text="",
+                        input_tokens=0,
+                        output_tokens=0,
+                        latency_ms=0,
+                        cost_usd=0,
+                        model=self.config.model_name,
+                        finish_reason="error",
+                        error=str(e),
+                    )
+                )
         return responses
 
     def shutdown(self) -> None:
@@ -232,8 +237,7 @@ class GeminiEngine(InferenceEngine):
         """Get total cost in USD."""
         input_price, output_price = self._get_pricing()
         return (
-            self._total_input_tokens * input_price +
-            self._total_output_tokens * output_price
+            self._total_input_tokens * input_price + self._total_output_tokens * output_price
         ) / 1_000_000
 
     @property

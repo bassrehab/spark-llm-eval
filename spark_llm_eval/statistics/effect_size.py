@@ -5,10 +5,11 @@ independent of sample size. This is crucial for understanding
 practical significance vs statistical significance.
 """
 
+import logging
+from dataclasses import dataclass
+
 import numpy as np
 from scipy import stats
-from dataclasses import dataclass
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ class EffectSizeResult:
         interpretation: Qualitative interpretation (small/medium/large).
         details: Additional information.
     """
+
     name: str
     value: float
     ci: tuple[float, float] | None
@@ -129,12 +131,12 @@ def _cohens_d_ci(
 
     # approximate SE for d
     if paired:
-        se = np.sqrt(1/n + d**2/(2*n))
+        se = np.sqrt(1 / n + d**2 / (2 * n))
     else:
-        se = np.sqrt(2/n + d**2/(2*n))
+        se = np.sqrt(2 / n + d**2 / (2 * n))
 
     alpha = 1 - confidence_level
-    z = stats.norm.ppf(1 - alpha/2)
+    z = stats.norm.ppf(1 - alpha / 2)
 
     lower = d - z * se
     upper = d + z * se
@@ -261,10 +263,10 @@ def odds_ratio(
 
         # CI using log transformation
         log_or = np.log(or_value)
-        se_log = np.sqrt(1/b01 + 1/b10)
+        se_log = np.sqrt(1 / b01 + 1 / b10)
 
         alpha = 1 - confidence_level
-        z = stats.norm.ppf(1 - alpha/2)
+        z = stats.norm.ppf(1 - alpha / 2)
 
         log_lower = log_or - z * se_log
         log_upper = log_or + z * se_log

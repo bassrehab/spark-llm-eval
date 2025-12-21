@@ -1,24 +1,25 @@
 """OpenAI inference engine implementation."""
 
-import time
 import logging
+import time
 from typing import Any
 
-from openai import OpenAI, APIError, RateLimitError as OpenAIRateLimitError
+from openai import APIError, OpenAI
+from openai import RateLimitError as OpenAIRateLimitError
 from tenacity import (
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
 )
 
-from spark_llm_eval.core.config import ModelConfig, InferenceConfig
-from spark_llm_eval.core.exceptions import InferenceError, RateLimitError, ConfigurationError
+from spark_llm_eval.core.config import InferenceConfig, ModelConfig
+from spark_llm_eval.core.exceptions import ConfigurationError, InferenceError, RateLimitError
 from spark_llm_eval.inference.base import InferenceEngine, InferenceRequest, InferenceResponse
 from spark_llm_eval.inference.rate_limiter import (
-    TokenBucketRateLimiter,
-    RateLimitConfig,
     NoOpRateLimiter,
+    RateLimitConfig,
+    TokenBucketRateLimiter,
 )
 
 logger = logging.getLogger(__name__)
@@ -87,14 +88,13 @@ class OpenAIInferenceEngine(InferenceEngine):
         self._client = OpenAI(**client_kwargs)
 
         # setup rate limiter
-        if (
-            self.inference_config.rate_limit_rpm
-            or self.inference_config.rate_limit_tpm
-        ):
-            self._rate_limiter = TokenBucketRateLimiter(RateLimitConfig(
-                requests_per_minute=self.inference_config.rate_limit_rpm,
-                tokens_per_minute=self.inference_config.rate_limit_tpm,
-            ))
+        if self.inference_config.rate_limit_rpm or self.inference_config.rate_limit_tpm:
+            self._rate_limiter = TokenBucketRateLimiter(
+                RateLimitConfig(
+                    requests_per_minute=self.inference_config.rate_limit_rpm,
+                    tokens_per_minute=self.inference_config.rate_limit_tpm,
+                )
+            )
         else:
             self._rate_limiter = NoOpRateLimiter()
 
@@ -110,6 +110,7 @@ class OpenAIInferenceEngine(InferenceEngine):
         # try Databricks secrets first
         try:
             from pyspark.sql import SparkSession
+
             spark = SparkSession.getActiveSession()
             if spark:
                 # secret_path format: "scope/key"
@@ -124,6 +125,7 @@ class OpenAIInferenceEngine(InferenceEngine):
 
         # fall back to environment variable
         import os
+
         env_key = secret_path.replace("/", "_").upper()
         value = os.environ.get(env_key)
         if value:
@@ -232,6 +234,7 @@ class OpenAIInferenceEngine(InferenceEngine):
         """Estimate tokens using tiktoken if available."""
         try:
             import tiktoken
+
             # gpt-4o uses cl100k_base
             enc = tiktoken.get_encoding("cl100k_base")
             return len(enc.encode(text))

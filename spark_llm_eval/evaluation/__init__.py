@@ -1,27 +1,27 @@
 """Evaluation metrics for LLM outputs."""
 
+from spark_llm_eval.evaluation.aggregator import (
+    AggregatedMetrics,
+    MetricAggregator,
+    compute_metrics,
+)
 from spark_llm_eval.evaluation.base import (
     Metric,
     MetricResult,
     ReferenceFreeMetic,
-    register_metric,
     get_metric,
     list_metrics,
+    register_metric,
 )
 from spark_llm_eval.evaluation.lexical import (
+    BLEUMetric,
+    ContainsMetric,
     ExactMatchMetric,
     F1Metric,
-    ContainsMetric,
-    BLEUMetric,
-    ROUGELMetric,
     LengthRatioMetric,
+    ROUGELMetric,
     normalize_text,
     tokenize,
-)
-from spark_llm_eval.evaluation.aggregator import (
-    MetricAggregator,
-    AggregatedMetrics,
-    compute_metrics,
 )
 
 # semantic metrics have optional dependencies
@@ -31,6 +31,7 @@ try:
         EmbeddingSimilarityMetric,
         SemanticSimilarityMetric,
     )
+
     _HAS_SEMANTIC = True
 except ImportError:
     _HAS_SEMANTIC = False
@@ -40,30 +41,31 @@ except ImportError:
 
 # LLM-as-judge metrics
 from spark_llm_eval.evaluation.llm_judge import (
+    GEvalMetric,
     JudgeConfig,
     LLMJudgeMetric,
     PairwiseJudgeMetric,
-    GEvalMetric,
 )
 
 # RAG evaluation metrics
 from spark_llm_eval.evaluation.rag import (
-    RAGMetric,
-    RAGJudgeConfig,
-    ContextRelevanceMetric,
-    FaithfulnessMetric,
     AnswerRelevanceMetric,
     ContextPrecisionMetric,
     ContextRecallMetric,
+    ContextRelevanceMetric,
+    FaithfulnessMetric,
+    RAGJudgeConfig,
+    RAGMetric,
 )
 
 # RAG embedding-based metrics (optional dependencies)
 try:
     from spark_llm_eval.evaluation.rag import (
-        ContextRelevanceEmbeddingMetric,
         AnswerRelevanceEmbeddingMetric,
+        ContextRelevanceEmbeddingMetric,
         FaithfulnessNLIMetric,
     )
+
     _HAS_RAG_EMBEDDING = True
 except ImportError:
     _HAS_RAG_EMBEDDING = False

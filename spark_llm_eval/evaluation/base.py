@@ -4,10 +4,10 @@ All metrics inherit from the Metric base class, which defines the
 interface for computing scores on predictions vs references.
 """
 
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +22,7 @@ class MetricResult:
         per_example_scores: Individual scores for each example.
         metadata: Additional metric-specific data.
     """
+
     name: str
     value: float
     per_example_scores: list[float] = field(default_factory=list)
@@ -170,6 +171,7 @@ def register_metric(cls_or_name=None):
         class MyMetric(Metric):
             ...
     """
+
     def decorator(cls: type[Metric]) -> type[Metric]:
         name = cls_or_name if isinstance(cls_or_name, str) else cls.name
         _METRIC_REGISTRY[name] = cls

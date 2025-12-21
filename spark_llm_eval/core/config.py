@@ -2,7 +2,10 @@
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from spark_llm_eval.cache.config import CacheConfig
 
 
 class ModelProvider(Enum):
@@ -18,6 +21,7 @@ class ModelProvider(Enum):
 class ModelConfig:
     """Config for the model being evaluated. Use api_key_secret for Databricks
     secret paths (like 'scope/key'), don't put actual keys here."""
+
     provider: ModelProvider
     model_name: str
     temperature: float = 0.0  # 0 for deterministic evals
@@ -36,6 +40,7 @@ class ModelConfig:
 @dataclass
 class MetricConfig:
     """Config for a metric like exact_match, bleu, bertscore etc."""
+
     name: str
     metric_type: str = "lexical"  # lexical, semantic, llm_judge, custom
     params: dict[str, Any] = field(default_factory=dict)
@@ -57,6 +62,7 @@ class MetricConfig:
 @dataclass(frozen=True)
 class SamplingConfig:
     """For when you dont want to eval the whole dataset."""
+
     strategy: str = "random"  # random, stratified, systematic
     sample_size: int | None = None
     sample_fraction: float | None = None
@@ -75,6 +81,7 @@ class SamplingConfig:
 @dataclass(frozen=True)
 class StatisticsConfig:
     """Controls CIs, significance testing etc."""
+
     confidence_level: float = 0.95
     bootstrap_iterations: int = 1000  # 10000 for final results
     significance_threshold: float = 0.05
@@ -93,26 +100,71 @@ class StatisticsConfig:
 
 @dataclass(frozen=True)
 class InferenceConfig:
-    """Inference settings - batch size, retries, rate limits."""
+    """Inference settings - batch size, retries, rate limits, caching.
+
+    For caching, prefer using cache_config over the legacy enable_caching/cache_table
+    fields. The new CacheConfig provides more control with policies like replay mode.
+
+    Example:
+        >>> from spark_llm_eval.cache import CacheConfig, CachePolicy
+        >>> config = InferenceConfig(
+        ...     batch_size=32,
+        ...     cache_config=CacheConfig(
+        ...         policy=CachePolicy.ENABLED,
+        ...         table_path="dbfs:/mnt/cache/responses",
+        ...         ttl_hours=24,
+        ...     ),
+        ... )
+    """
+
     batch_size: int = 32  # tune based on your rate limits
     max_retries: int = 3
     retry_delay: float = 1.0
     timeout: float = 60.0
     rate_limit_rpm: int | None = None  # requests/min
     rate_limit_tpm: int | None = None  # tokens/min
+    # New Delta-backed caching (preferred)
+    cache_config: "CacheConfig | None" = None
+    # Legacy caching fields (deprecated, kept for backward compatibility)
     enable_caching: bool = True
     cache_table: str | None = None
 
     def __post_init__(self):
         if self.batch_size < 1:
             raise ValueError("batch_size cant be < 1")
-        # XXX: should we warn if caching enabled but no cache_table?
-        # for now the orchestrator sets it if missing
+
+    def get_effective_cache_config(self) -> "CacheConfig":
+        """Get the effective cache configuration.
+
+        Handles backward compatibility with legacy enable_caching/cache_table fields.
+
+        Returns:
+            CacheConfig with appropriate policy and settings
+        """
+        from spark_llm_eval.cache.config import CacheConfig, CachePolicy
+
+        # New config takes precedence
+        if self.cache_config is not None:
+            return self.cache_config
+
+        # Convert legacy fields to CacheConfig
+        if not self.enable_caching:
+            return CacheConfig(policy=CachePolicy.DISABLED, table_path=None)
+
+        if self.cache_table:
+            return CacheConfig(
+                policy=CachePolicy.ENABLED,
+                table_path=self.cache_table,
+            )
+
+        # Caching enabled but no table specified - disabled
+        return CacheConfig(policy=CachePolicy.DISABLED, table_path=None)
 
 
 @dataclass
 class OutputConfig:
     """Where to save stuff."""
+
     results_path: str | None = None
     predictions_table: str | None = None
     metrics_table: str | None = None

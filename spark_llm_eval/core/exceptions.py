@@ -17,11 +17,13 @@ class SparkLLMEvalError(Exception):
 
 class ConfigurationError(SparkLLMEvalError):
     """Bad config - missing api key, invalid model name, etc."""
+
     pass
 
 
 class InferenceError(SparkLLMEvalError):
     """LLM API call failed. See RateLimitError for rate limits specifically."""
+
     pass
 
 
@@ -35,16 +37,19 @@ class RateLimitError(InferenceError):
 
 class MetricComputationError(SparkLLMEvalError):
     """Metric computation blew up."""
+
     pass
 
 
 class DatasetError(SparkLLMEvalError):
     """Something wrong with the dataset - missing table, bad schema, etc."""
+
     pass
 
 
 class CacheError(SparkLLMEvalError):
     """Cache operation failed. Usually non-fatal, eval can continue without it."""
+
     pass
 
 

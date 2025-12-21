@@ -1,9 +1,9 @@
 """Multi-agent debate evaluation metrics."""
 
+import logging
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
-import logging
 
 from spark_llm_eval.evaluation.base import Metric, MetricResult, register_metric
 
@@ -29,6 +29,7 @@ class DebateRole(Enum):
 @dataclass
 class Argument:
     """A single argument in a debate."""
+
     agent_id: str
     role: DebateRole
     argument_type: ArgumentType
@@ -48,6 +49,7 @@ class DebateRound:
 @dataclass
 class DebateSession:
     """Complete debate session between agents."""
+
     session_id: str
     topic: str
     agents: list[str]
@@ -421,9 +423,7 @@ class ArgumentQualityMetric(Metric):
         import json
 
         scores = []
-        component_scores: dict[str, list[float]] = {
-            k: [] for k in self.weights
-        }
+        component_scores: dict[str, list[float]] = {k: [] for k in self.weights}
 
         for pred, ref in zip(predictions, references):
             try:
@@ -449,10 +449,7 @@ class ArgumentQualityMetric(Metric):
                     component_scores[comp].append(0.0)
 
         # Compute average component scores for metadata
-        avg_components = {
-            k: sum(v) / len(v) if v else 0.0
-            for k, v in component_scores.items()
-        }
+        avg_components = {k: sum(v) / len(v) if v else 0.0 for k, v in component_scores.items()}
 
         return MetricResult(
             name=self.name,
@@ -523,21 +520,25 @@ def parse_debate_from_messages(
         if msg.get("end_round", False) or (
             arg_type == ArgumentType.SYNTHESIS and len(current_round_args) >= 2
         ):
-            rounds.append(DebateRound(
-                round_number=round_num,
-                arguments=current_round_args,
-                topic=topic,
-            ))
+            rounds.append(
+                DebateRound(
+                    round_number=round_num,
+                    arguments=current_round_args,
+                    topic=topic,
+                )
+            )
             current_round_args = []
             round_num += 1
 
     # Add remaining arguments as final round
     if current_round_args:
-        rounds.append(DebateRound(
-            round_number=round_num,
-            arguments=current_round_args,
-            topic=topic,
-        ))
+        rounds.append(
+            DebateRound(
+                round_number=round_num,
+                arguments=current_round_args,
+                topic=topic,
+            )
+        )
 
     return DebateSession(
         session_id=session_id,

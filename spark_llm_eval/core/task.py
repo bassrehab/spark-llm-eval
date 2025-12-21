@@ -4,12 +4,12 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from spark_llm_eval.core.config import (
-    ModelConfig,
+    InferenceConfig,
     MetricConfig,
+    ModelConfig,
+    OutputConfig,
     SamplingConfig,
     StatisticsConfig,
-    InferenceConfig,
-    OutputConfig,
 )
 
 
@@ -55,6 +55,7 @@ class EvalTask:
         checkpoint_path: For resuming interrupted evaluations.
         parallelism: Number of Spark partitions. None = auto.
     """
+
     # required fields
     task_id: str
     name: str
@@ -110,4 +111,5 @@ class EvalTask:
         """
         # TODO: proper recursive serialization
         from dataclasses import asdict
+
         return asdict(self)

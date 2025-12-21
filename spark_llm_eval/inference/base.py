@@ -4,10 +4,10 @@ All LLM providers implement this interface, making it easy to swap
 providers without changing evaluation code.
 """
 
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +24,7 @@ class InferenceRequest:
         stop_sequences: Sequences that stop generation.
         metadata: Optional extra data passed through to response.
     """
+
     prompt: str
     request_id: str = ""
     max_tokens: int = 1024
@@ -48,6 +49,7 @@ class InferenceResponse:
         error: If not None, indicates the request failed.
         metadata: Passed through from request.
     """
+
     text: str | None
     input_tokens: int
     output_tokens: int
@@ -120,10 +122,7 @@ class InferenceEngine(ABC):
         """
         pass
 
-    def infer_batch(
-        self,
-        requests: list[InferenceRequest]
-    ) -> list[InferenceResponse]:
+    def infer_batch(self, requests: list[InferenceRequest]) -> list[InferenceResponse]:
         """Run inference on a batch of requests.
 
         Default implementation just loops over infer(). Subclasses
@@ -144,16 +143,18 @@ class InferenceEngine(ABC):
             except Exception as e:
                 # don't let one failure kill the batch
                 logger.warning(f"Request {req.request_id} failed: {e}")
-                responses.append(InferenceResponse(
-                    request_id=req.request_id,
-                    text=None,
-                    input_tokens=0,
-                    output_tokens=0,
-                    latency_ms=0,
-                    cost_usd=0,
-                    error=str(e),
-                    metadata=req.metadata,
-                ))
+                responses.append(
+                    InferenceResponse(
+                        request_id=req.request_id,
+                        text=None,
+                        input_tokens=0,
+                        output_tokens=0,
+                        latency_ms=0,
+                        cost_usd=0,
+                        error=str(e),
+                        metadata=req.metadata,
+                    )
+                )
         return responses
 
     @abstractmethod

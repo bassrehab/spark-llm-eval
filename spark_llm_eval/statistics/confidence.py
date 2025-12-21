@@ -1,9 +1,10 @@
 """CI computation - bootstrap and analytical methods."""
 
+import logging
+from collections.abc import Callable
+
 import numpy as np
 from scipy import stats
-from typing import Callable
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -169,8 +170,14 @@ def analytical_ci_proportion(
         upper = min(1.0, p + margin)
     elif method == "clopper-pearson":
         # exact but overly conservative
-        lower = stats.beta.ppf(alpha / 2, successes, total - successes + 1) if successes > 0 else 0.0
-        upper = stats.beta.ppf(1 - alpha / 2, successes + 1, total - successes) if successes < total else 1.0
+        lower = (
+            stats.beta.ppf(alpha / 2, successes, total - successes + 1) if successes > 0 else 0.0
+        )
+        upper = (
+            stats.beta.ppf(1 - alpha / 2, successes + 1, total - successes)
+            if successes < total
+            else 1.0
+        )
     else:
         raise ValueError(f"unknown method {method}, try wilson/normal/clopper-pearson")
 

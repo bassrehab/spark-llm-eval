@@ -1,6 +1,6 @@
 """Result types for evaluation outputs."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
@@ -8,6 +8,7 @@ from typing import Any
 @dataclass
 class MetricValue:
     """A metric value with CI. The main output type for all metrics."""
+
     value: float
     confidence_interval: tuple[float, float]
     confidence_level: float
@@ -19,9 +20,11 @@ class MetricValue:
         return f"{self.value:.4f} [{lo:.4f}, {hi:.4f}]"
 
     def __repr__(self):
-        return (f"MetricValue(value={self.value:.4f}, "
-                f"ci=[{self.confidence_interval[0]:.4f}, {self.confidence_interval[1]:.4f}], "
-                f"n={self.sample_size})")
+        return (
+            f"MetricValue(value={self.value:.4f}, "
+            f"ci=[{self.confidence_interval[0]:.4f}, {self.confidence_interval[1]:.4f}], "
+            f"n={self.sample_size})"
+        )
 
     @property
     def ci_width(self):
@@ -37,6 +40,7 @@ class MetricValue:
 @dataclass
 class ComparisonResult:
     """Result of comparing two runs (is model A better than B?)"""
+
     metric_name: str
     baseline_value: MetricValue
     comparison_value: MetricValue
@@ -54,28 +58,57 @@ class ComparisonResult:
 
 @dataclass
 class CostBreakdown:
-    """Cost tracking for eval run."""
+    """Cost tracking for eval run.
+
+    Includes both actual API costs and estimated savings from cache hits.
+    """
+
     total_cost_usd: float
     input_tokens: int
     output_tokens: int
     num_requests: int
     cached_requests: int = 0
+    estimated_savings_usd: float = 0.0  # Cost avoided via cache hits
 
     @property
-    def cost_per_example(self):
+    def cost_per_example(self) -> float:
+        """Average cost per API request."""
         if self.num_requests == 0:
             return 0.0
         return self.total_cost_usd / self.num_requests
 
     @property
-    def cache_hit_rate(self):
+    def effective_cost_per_example(self) -> float:
+        """Average cost per example including cached requests (amortized)."""
+        total_examples = self.num_requests + self.cached_requests
+        if total_examples == 0:
+            return 0.0
+        return self.total_cost_usd / total_examples
+
+    @property
+    def cache_hit_rate(self) -> float:
+        """Cache hit rate as a fraction (0-1)."""
         total = self.num_requests + self.cached_requests
         return self.cached_requests / total if total > 0 else 0.0
+
+    @property
+    def cache_savings_pct(self) -> float:
+        """Percentage of cost saved by caching (0-100)."""
+        total_potential = self.total_cost_usd + self.estimated_savings_usd
+        if total_potential == 0:
+            return 0.0
+        return (self.estimated_savings_usd / total_potential) * 100
+
+    @property
+    def total_tokens(self) -> int:
+        """Total tokens used (input + output)."""
+        return self.input_tokens + self.output_tokens
 
 
 @dataclass
 class LatencyStats:
     """Latency stats in milliseconds."""
+
     mean_ms: float
     median_ms: float
     p95_ms: float
@@ -91,6 +124,7 @@ class LatencyStats:
 @dataclass
 class EvalResult:
     """What you get back from runner.run(). Has metrics, costs, latencies etc."""
+
     task_id: str
     run_id: str | None
     timestamp: datetime
@@ -136,9 +170,11 @@ class EvalResult:
                 for name, val in metrics.items():
                     lines.append(f"    {name}: {val}")
 
-        lines.extend([
-            "",
-            f"Cost: ${self.cost.total_cost_usd:.4f} ({self.cost.num_requests} requests)",
-            f"Latency: {self.latency}",
-        ])
+        lines.extend(
+            [
+                "",
+                f"Cost: ${self.cost.total_cost_usd:.4f} ({self.cost.num_requests} requests)",
+                f"Latency: {self.latency}",
+            ]
+        )
         return "\n".join(lines)

@@ -4,13 +4,13 @@ Provides experiment tracking, metric logging, and artifact management
 for LLM evaluation runs.
 """
 
-from dataclasses import dataclass, field
-from typing import Optional, Dict, Any, List
-from contextlib import contextmanager
 import json
 import logging
-import tempfile
 import os
+import tempfile
+from contextlib import contextmanager
+from dataclasses import dataclass, field
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -24,11 +24,10 @@ def _get_mlflow():
     if _mlflow is None:
         try:
             import mlflow
+
             _mlflow = mlflow
         except ImportError:
-            raise ImportError(
-                "MLflow not installed. Install with: pip install mlflow"
-            )
+            raise ImportError("MLflow not installed. Install with: pip install mlflow")
     return _mlflow
 
 
@@ -44,12 +43,13 @@ class TrackingConfig:
         log_artifacts: Whether to log artifacts (results, configs).
         artifact_location: Custom artifact location.
     """
+
     experiment_name: str
-    tracking_uri: Optional[str] = None
-    run_name: Optional[str] = None
-    tags: Dict[str, str] = field(default_factory=dict)
+    tracking_uri: str | None = None
+    run_name: str | None = None
+    tags: dict[str, str] = field(default_factory=dict)
     log_artifacts: bool = True
-    artifact_location: Optional[str] = None
+    artifact_location: str | None = None
 
 
 class MLflowTracker:
@@ -66,7 +66,7 @@ class MLflowTracker:
             config: Tracking configuration.
         """
         self.config = config
-        self._run_id: Optional[str] = None
+        self._run_id: str | None = None
         self._mlflow = None
         self._initialized = False
 
@@ -95,7 +95,7 @@ class MLflowTracker:
         self._initialized = True
 
     @contextmanager
-    def start_run(self, run_name: Optional[str] = None):
+    def start_run(self, run_name: str | None = None):
         """Context manager for MLflow run.
 
         Args:
@@ -125,7 +125,7 @@ class MLflowTracker:
             finally:
                 self._run_id = None
 
-    def log_params(self, params: Dict[str, Any]) -> None:
+    def log_params(self, params: dict[str, Any]) -> None:
         """Log parameters to MLflow.
 
         Args:
@@ -149,8 +149,8 @@ class MLflowTracker:
 
     def log_metrics(
         self,
-        metrics: Dict[str, float],
-        step: Optional[int] = None,
+        metrics: dict[str, float],
+        step: int | None = None,
     ) -> None:
         """Log metrics to MLflow.
 
@@ -169,7 +169,7 @@ class MLflowTracker:
         value: float,
         ci_lower: float,
         ci_upper: float,
-        step: Optional[int] = None,
+        step: int | None = None,
     ) -> None:
         """Log metric with confidence interval.
 
@@ -191,7 +191,7 @@ class MLflowTracker:
         self,
         data: Any,
         filename: str,
-        artifact_path: Optional[str] = None,
+        artifact_path: str | None = None,
     ) -> None:
         """Log artifact to MLflow.
 
@@ -218,12 +218,13 @@ class MLflowTracker:
             else:
                 # try to pickle
                 import pickle
+
                 with open(filepath, "wb") as f:
                     pickle.dump(data, f)
 
             self._mlflow.log_artifact(filepath, artifact_path)
 
-    def log_eval_config(self, config: Dict[str, Any]) -> None:
+    def log_eval_config(self, config: dict[str, Any]) -> None:
         """Log evaluation configuration.
 
         Args:
@@ -234,7 +235,7 @@ class MLflowTracker:
 
     def log_results_summary(
         self,
-        metrics: Dict[str, Dict[str, float]],
+        metrics: dict[str, dict[str, float]],
     ) -> None:
         """Log evaluation results summary.
 
@@ -267,7 +268,7 @@ class MLflowTracker:
             self._init_mlflow()
         self._mlflow.set_tag(key, value)
 
-    def get_run_url(self) -> Optional[str]:
+    def get_run_url(self) -> str | None:
         """Get URL to current run in MLflow UI.
 
         Returns:
@@ -285,18 +286,16 @@ class MLflowTracker:
 
     @staticmethod
     def _flatten_dict(
-        d: Dict[str, Any],
+        d: dict[str, Any],
         parent_key: str = "",
         sep: str = ".",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Flatten nested dictionary."""
         items = []
         for k, v in d.items():
             new_key = f"{parent_key}{sep}{k}" if parent_key else k
             if isinstance(v, dict):
-                items.extend(
-                    MLflowTracker._flatten_dict(v, new_key, sep).items()
-                )
+                items.extend(MLflowTracker._flatten_dict(v, new_key, sep).items())
             else:
                 items.append((new_key, v))
         return dict(items)
@@ -304,9 +303,9 @@ class MLflowTracker:
 
 def create_tracker(
     experiment_name: str,
-    tracking_uri: Optional[str] = None,
-    run_name: Optional[str] = None,
-    tags: Optional[Dict[str, str]] = None,
+    tracking_uri: str | None = None,
+    run_name: str | None = None,
+    tags: dict[str, str] | None = None,
 ) -> MLflowTracker:
     """Create an MLflow tracker with convenient defaults.
 

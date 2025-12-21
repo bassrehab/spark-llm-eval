@@ -1,9 +1,9 @@
 """Tool use evaluation metrics for agents."""
 
-from dataclasses import dataclass, field
-from typing import Any
 import json
 import logging
+from dataclasses import dataclass, field
+from typing import Any
 
 from spark_llm_eval.evaluation.base import Metric, MetricResult, register_metric
 
@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ToolCall:
     """Represents a single tool call."""
+
     name: str
     parameters: dict[str, Any] = field(default_factory=dict)
     result: Any = None
@@ -33,6 +34,7 @@ class ToolCall:
 @dataclass
 class ToolCallSequence:
     """A sequence of tool calls from an agent."""
+
     calls: list[ToolCall]
     task_description: str = ""
     final_answer: str | None = None
@@ -220,8 +222,7 @@ class ToolParameterAccuracyMetric(Metric):
             if self.check_values:
                 # Check both keys and values
                 matching = sum(
-                    1 for k, v in ref_params.items()
-                    if k in pred_params and pred_params[k] == v
+                    1 for k, v in ref_params.items() if k in pred_params and pred_params[k] == v
                 )
             else:
                 # Check only keys
