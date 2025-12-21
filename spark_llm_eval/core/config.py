@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from spark_llm_eval.cache.config import CacheConfig
@@ -21,6 +21,7 @@ class ModelProvider(Enum):
 class ModelConfig:
     """Config for the model being evaluated. Use api_key_secret for Databricks
     secret paths (like 'scope/key'), don't put actual keys here."""
+
     provider: ModelProvider
     model_name: str
     temperature: float = 0.0  # 0 for deterministic evals
@@ -39,6 +40,7 @@ class ModelConfig:
 @dataclass
 class MetricConfig:
     """Config for a metric like exact_match, bleu, bertscore etc."""
+
     name: str
     metric_type: str = "lexical"  # lexical, semantic, llm_judge, custom
     params: dict[str, Any] = field(default_factory=dict)
@@ -60,6 +62,7 @@ class MetricConfig:
 @dataclass(frozen=True)
 class SamplingConfig:
     """For when you dont want to eval the whole dataset."""
+
     strategy: str = "random"  # random, stratified, systematic
     sample_size: int | None = None
     sample_fraction: float | None = None
@@ -78,6 +81,7 @@ class SamplingConfig:
 @dataclass(frozen=True)
 class StatisticsConfig:
     """Controls CIs, significance testing etc."""
+
     confidence_level: float = 0.95
     bootstrap_iterations: int = 1000  # 10000 for final results
     significance_threshold: float = 0.05
@@ -112,6 +116,7 @@ class InferenceConfig:
         ...     ),
         ... )
     """
+
     batch_size: int = 32  # tune based on your rate limits
     max_retries: int = 3
     retry_delay: float = 1.0
@@ -159,6 +164,7 @@ class InferenceConfig:
 @dataclass
 class OutputConfig:
     """Where to save stuff."""
+
     results_path: str | None = None
     predictions_table: str | None = None
     metrics_table: str | None = None

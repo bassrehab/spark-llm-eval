@@ -1,9 +1,9 @@
 """Multi-turn trajectory evaluation for agent conversations."""
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
-from abc import ABC, abstractmethod
 
 from spark_llm_eval.evaluation.base import Metric, MetricResult, register_metric
 
@@ -26,6 +26,7 @@ class ActionType(Enum):
 @dataclass
 class Action:
     """An action taken by the agent."""
+
     action_type: ActionType
     content: str
     parameters: dict[str, Any] = field(default_factory=dict)
@@ -35,6 +36,7 @@ class Action:
 @dataclass
 class Observation:
     """Result of an action (tool output etc)."""
+
     content: str
     success: bool = True
     error: str | None = None
@@ -44,6 +46,7 @@ class Observation:
 @dataclass
 class Turn:
     """Single turn in a conversation."""
+
     role: TurnRole
     content: str
     action: Action | None = None
@@ -64,6 +67,7 @@ class Trajectory:
         goal_achieved: Whether the goal was achieved.
         metadata: Trajectory-level metadata.
     """
+
     trajectory_id: str
     turns: list[Turn]
     initial_goal: str
@@ -85,8 +89,7 @@ class Trajectory:
     def num_tool_calls(self) -> int:
         """Number of tool calls made."""
         return sum(
-            1 for t in self.turns
-            if t.action and t.action.action_type == ActionType.TOOL_CALL
+            1 for t in self.turns if t.action and t.action.action_type == ActionType.TOOL_CALL
         )
 
     @property
@@ -97,10 +100,7 @@ class Trajectory:
     @property
     def tool_calls(self) -> list[Action]:
         """Extract all tool call actions."""
-        return [
-            a for a in self.actions
-            if a.action_type == ActionType.TOOL_CALL
-        ]
+        return [a for a in self.actions if a.action_type == ActionType.TOOL_CALL]
 
     def get_turn(self, index: int) -> Turn | None:
         """Get turn by index."""
@@ -120,6 +120,7 @@ class TrajectoryPair:
         reference: Optional reference/gold trajectory.
         reference_goal_achieved: Whether reference achieved goal.
     """
+
     predicted: Trajectory
     reference: Trajectory | None = None
     reference_goal_achieved: bool | None = None
@@ -354,10 +355,7 @@ class ToolCallAccuracyMetric(TrajectoryMetric, Metric):
                     scores.append(1.0 if not pred_tools else 0.0)
                     continue
 
-                matches = sum(
-                    1 for p, r in zip(pred_tools, ref_tools)
-                    if p == r
-                )
+                matches = sum(1 for p, r in zip(pred_tools, ref_tools) if p == r)
                 scores.append(matches / len(ref_tools))
 
         return MetricResult(
@@ -402,12 +400,10 @@ class ActionSequenceF1Metric(TrajectoryMetric, Metric):
                     continue
 
                 pred_actions = set(
-                    f"{a.action_type.value}:{a.content}"
-                    for a in pair.predicted.actions
+                    f"{a.action_type.value}:{a.content}" for a in pair.predicted.actions
                 )
                 ref_actions = set(
-                    f"{a.action_type.value}:{a.content}"
-                    for a in pair.reference.actions
+                    f"{a.action_type.value}:{a.content}" for a in pair.reference.actions
                 )
 
                 f1 = self._compute_f1(pred_actions, ref_actions)

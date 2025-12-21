@@ -3,7 +3,6 @@
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, Tuple
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
@@ -54,9 +53,7 @@ CACHE_TABLE_SCHEMA = StructType(
         StructField("task_id", StringType(), nullable=True),
         StructField("run_id", StringType(), nullable=True),
         # Extensibility
-        StructField(
-            "metadata", MapType(StringType(), StringType()), nullable=True
-        ),
+        StructField("metadata", MapType(StringType(), StringType()), nullable=True),
     ]
 )
 
@@ -179,7 +176,7 @@ class DeltaCacheManager:
 
         return df.withColumn("cache_key", compute_cache_key(F.col(prompt_column)))
 
-    def lookup(self, df: DataFrame) -> Tuple[DataFrame, DataFrame]:
+    def lookup(self, df: DataFrame) -> tuple[DataFrame, DataFrame]:
         """Look up cached responses.
 
         Performs a left join with the cache table to find cached responses.
@@ -261,8 +258,8 @@ class DeltaCacheManager:
     def store(
         self,
         df: DataFrame,
-        task_id: Optional[str] = None,
-        run_id: Optional[str] = None,
+        task_id: str | None = None,
+        run_id: str | None = None,
     ) -> None:
         """Store inference results in cache.
 
@@ -316,8 +313,12 @@ class DeltaCacheManager:
             "response_text",
             F.col("input_tokens").cast("int"),
             F.col("output_tokens").cast("int"),
-            F.col("finish_reason").cast("string") if "finish_reason" in df.columns else F.lit(None).cast("string").alias("finish_reason"),
-            F.col("error").cast("string") if "error" in df.columns else F.lit(None).cast("string").alias("error"),
+            F.col("finish_reason").cast("string")
+            if "finish_reason" in df.columns
+            else F.lit(None).cast("string").alias("finish_reason"),
+            F.col("error").cast("string")
+            if "error" in df.columns
+            else F.lit(None).cast("string").alias("error"),
             F.col("cost_usd").cast("float"),
             F.col("latency_ms").cast("float"),
             "created_at",
@@ -380,9 +381,9 @@ class DeltaCacheManager:
 
     def invalidate(
         self,
-        model_name: Optional[str] = None,
-        before_timestamp: Optional[datetime] = None,
-        cache_version: Optional[str] = None,
+        model_name: str | None = None,
+        before_timestamp: datetime | None = None,
+        cache_version: str | None = None,
     ) -> int:
         """Invalidate (delete) cache entries matching criteria.
 
@@ -414,10 +415,7 @@ class DeltaCacheManager:
 
         # Count before delete
         count_before = (
-            self.spark.read.format("delta")
-            .load(self.config.table_path)
-            .filter(condition)
-            .count()
+            self.spark.read.format("delta").load(self.config.table_path).filter(condition).count()
         )
 
         cache_table = DeltaTable.forPath(self.spark, self.config.table_path)
@@ -457,11 +455,7 @@ class DeltaCacheManager:
             total_entries = cache_df.count()
 
             # Get entry counts by model
-            by_model = (
-                cache_df.groupBy("model_name", "provider")
-                .count()
-                .collect()
-            )
+            by_model = cache_df.groupBy("model_name", "provider").count().collect()
 
             return {
                 "table_path": self.config.table_path,

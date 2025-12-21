@@ -4,15 +4,14 @@ Combines per-example scores into aggregate metrics with
 confidence intervals and optional stratification.
 """
 
-from dataclasses import dataclass
-from typing import Any
 import logging
+from dataclasses import dataclass
 
 import numpy as np
 
 from spark_llm_eval.core.config import StatisticsConfig
 from spark_llm_eval.core.result import MetricValue
-from spark_llm_eval.evaluation.base import Metric, MetricResult, get_metric
+from spark_llm_eval.evaluation.base import MetricResult, get_metric
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +25,7 @@ class AggregatedMetrics:
         stratified: Stratum -> metric name -> MetricValue.
         raw_results: Original MetricResult objects.
     """
+
     metrics: dict[str, MetricValue]
     stratified: dict[str, dict[str, MetricValue]]
     raw_results: list[MetricResult]
@@ -140,9 +140,7 @@ class MetricAggregator:
         for i, stratum in enumerate(strata):
             for result in results:
                 if i < len(result.per_example_scores):
-                    stratum_scores[stratum][result.name].append(
-                        result.per_example_scores[i]
-                    )
+                    stratum_scores[stratum][result.name].append(result.per_example_scores[i])
 
         # compute metrics for each stratum
         stratified = {}
@@ -150,9 +148,7 @@ class MetricAggregator:
             stratified[stratum] = {}
             for metric_name, scores in metric_scores.items():
                 if scores:
-                    stratified[stratum][metric_name] = self._compute_metric_value(
-                        np.array(scores)
-                    )
+                    stratified[stratum][metric_name] = self._compute_metric_value(np.array(scores))
 
         return stratified
 

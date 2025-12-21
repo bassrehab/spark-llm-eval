@@ -2,7 +2,7 @@
 
 import hashlib
 import json
-from typing import Any, Optional
+from typing import Any
 
 
 def generate_cache_key(
@@ -11,7 +11,7 @@ def generate_cache_key(
     provider: str,
     temperature: float,
     max_tokens: int,
-    extra_params: Optional[dict[str, Any]] = None,
+    extra_params: dict[str, Any] | None = None,
 ) -> str:
     """Generate a content-addressable cache key.
 

@@ -1,10 +1,8 @@
 """Lexical metrics - string/token matching without semantic understanding."""
 
-import re
+import logging
 import string
 from collections import Counter
-from typing import Callable
-import logging
 
 from spark_llm_eval.evaluation.base import Metric, MetricResult, register_metric
 
@@ -226,6 +224,7 @@ class BLEUMetric(Metric):
         # geometric mean of precisions
         if all(p > 0 for p in precisions):
             import math
+
             log_precision = sum(math.log(p) for p in precisions) / len(precisions)
             geo_mean = math.exp(log_precision)
         else:
@@ -237,7 +236,7 @@ class BLEUMetric(Metric):
         return bp * geo_mean
 
     def _get_ngrams(self, tokens, n):
-        ngrams = [tuple(tokens[i:i + n]) for i in range(len(tokens) - n + 1)]
+        ngrams = [tuple(tokens[i : i + n]) for i in range(len(tokens) - n + 1)]
         return Counter(ngrams)
 
     def _brevity_penalty(self, pred_len, ref_len):
@@ -246,6 +245,7 @@ class BLEUMetric(Metric):
         if pred_len == 0:
             return 0.0
         import math
+
         return math.exp(1 - ref_len / pred_len)
 
 

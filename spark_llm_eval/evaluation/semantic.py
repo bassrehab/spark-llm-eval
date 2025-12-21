@@ -4,9 +4,9 @@ These metrics use embeddings or language models to measure
 semantic similarity rather than exact lexical overlap.
 """
 
-import numpy as np
-from typing import List, Optional, Dict, Any
 import logging
+
+import numpy as np
 
 from spark_llm_eval.evaluation.base import Metric, MetricResult, register_metric
 
@@ -24,11 +24,10 @@ def _get_transformers():
     if _transformers is None:
         try:
             import transformers
+
             _transformers = transformers
         except ImportError:
-            raise ImportError(
-                "transformers not installed. Install with: pip install transformers"
-            )
+            raise ImportError("transformers not installed. Install with: pip install transformers")
     return _transformers
 
 
@@ -38,11 +37,10 @@ def _get_torch():
     if _torch is None:
         try:
             import torch
+
             _torch = torch
         except ImportError:
-            raise ImportError(
-                "torch not installed. Install with: pip install torch"
-            )
+            raise ImportError("torch not installed. Install with: pip install torch")
     return _torch
 
 
@@ -52,6 +50,7 @@ def _get_sentence_transformers():
     if _sentence_transformers is None:
         try:
             import sentence_transformers
+
             _sentence_transformers = sentence_transformers
         except ImportError:
             raise ImportError(
@@ -78,7 +77,7 @@ class BERTScoreMetric(Metric):
         self,
         model_name: str = "microsoft/deberta-xlarge-mnli",
         batch_size: int = 32,
-        device: Optional[str] = None,
+        device: str | None = None,
         use_fast_tokenizer: bool = True,
     ):
         """Initialize BERTScore metric.
@@ -120,7 +119,7 @@ class BERTScoreMetric(Metric):
         self._model.to(self.device)
         self._model.eval()
 
-    def _get_embeddings(self, texts: List[str]) -> np.ndarray:
+    def _get_embeddings(self, texts: list[str]) -> np.ndarray:
         """Get token embeddings for texts."""
         torch = _get_torch()
         self._load_model()
@@ -128,7 +127,7 @@ class BERTScoreMetric(Metric):
         all_embeddings = []
 
         for i in range(0, len(texts), self.batch_size):
-            batch = texts[i:i + self.batch_size]
+            batch = texts[i : i + self.batch_size]
 
             inputs = self._tokenizer(
                 batch,
@@ -157,7 +156,9 @@ class BERTScoreMetric(Metric):
     ) -> tuple[float, float, float]:
         """Compute BERTScore P/R/F1 for a single example."""
         # normalize embeddings
-        pred_norm = pred_embeddings / (np.linalg.norm(pred_embeddings, axis=-1, keepdims=True) + 1e-8)
+        pred_norm = pred_embeddings / (
+            np.linalg.norm(pred_embeddings, axis=-1, keepdims=True) + 1e-8
+        )
         ref_norm = ref_embeddings / (np.linalg.norm(ref_embeddings, axis=-1, keepdims=True) + 1e-8)
 
         # compute similarity matrix
@@ -188,8 +189,8 @@ class BERTScoreMetric(Metric):
 
     def compute(
         self,
-        predictions: List[str],
-        references: List[str],
+        predictions: list[str],
+        references: list[str],
         **kwargs,
     ) -> MetricResult:
         """Compute BERTScore for predictions vs references.
@@ -221,8 +222,8 @@ class BERTScoreMetric(Metric):
 
         # process in batches
         for i in range(0, len(predictions), self.batch_size):
-            batch_preds = predictions[i:i + self.batch_size]
-            batch_refs = references[i:i + self.batch_size]
+            batch_preds = predictions[i : i + self.batch_size]
+            batch_refs = references[i : i + self.batch_size]
 
             # tokenize
             pred_inputs = self._tokenizer(
@@ -295,7 +296,7 @@ class EmbeddingSimilarityMetric(Metric):
         self,
         model_name: str = "all-MiniLM-L6-v2",
         batch_size: int = 32,
-        device: Optional[str] = None,
+        device: str | None = None,
     ):
         """Initialize embedding similarity metric.
 
@@ -320,8 +321,8 @@ class EmbeddingSimilarityMetric(Metric):
 
     def compute(
         self,
-        predictions: List[str],
-        references: List[str],
+        predictions: list[str],
+        references: list[str],
         **kwargs,
     ) -> MetricResult:
         """Compute cosine similarity between predictions and references.

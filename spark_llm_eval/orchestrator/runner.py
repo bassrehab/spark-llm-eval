@@ -1,23 +1,23 @@
 """Main eval runner - ties together inference, metrics, and stats."""
 
-from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any, Callable
-from pyspark.sql import SparkSession, DataFrame
-from pyspark.sql import functions as F
-from pyspark.sql.types import StringType, StructType, StructField, FloatType
 import logging
 import time
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
+
+from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import functions as F
 
 from spark_llm_eval.core.config import (
-    ModelConfig,
     InferenceConfig,
     MetricConfig,
-    StatisticsConfig,
+    ModelConfig,
     OutputConfig,
+    StatisticsConfig,
 )
+from spark_llm_eval.core.result import CostBreakdown, EvalResult, LatencyStats, MetricValue
 from spark_llm_eval.core.task import EvalTask
-from spark_llm_eval.core.result import EvalResult, MetricValue, CostBreakdown, LatencyStats
 
 logger = logging.getLogger(__name__)
 
@@ -25,18 +25,15 @@ logger = logging.getLogger(__name__)
 @dataclass
 class RunnerConfig:
     """Config for eval runner."""
+
     model_config: ModelConfig
-    metrics: List[MetricConfig]
-    statistics_config: StatisticsConfig = field(
-        default_factory=lambda: StatisticsConfig()
-    )
-    inference_config: InferenceConfig = field(
-        default_factory=lambda: InferenceConfig()
-    )
+    metrics: list[MetricConfig]
+    statistics_config: StatisticsConfig = field(default_factory=lambda: StatisticsConfig())
+    inference_config: InferenceConfig = field(default_factory=lambda: InferenceConfig())
     output_config: OutputConfig = field(default_factory=lambda: OutputConfig())
     checkpoint_interval: int = 0
     cache_responses: bool = True
-    response_cache_path: Optional[str] = None
+    response_cache_path: str | None = None
 
 
 class EvaluationRunner:
@@ -135,26 +132,18 @@ class EvaluationRunner:
         if len(template_cols) == 1:
             if template_str and "{{" in template_str:
                 prompt_col = F.regexp_replace(
-                    F.lit(template_str),
-                    r"\{\{\s*" + col_name + r"\s*\}\}",
-                    F.col(col_name)
+                    F.lit(template_str), r"\{\{\s*" + col_name + r"\s*\}\}", F.col(col_name)
                 )
             else:
                 prompt_col = F.col(col_name)
         else:
             prompt_col = F.lit(template_str)
             for col in template_cols:
-                prompt_col = F.regexp_replace(
-                    prompt_col,
-                    r"\{\{\s*" + col + r"\s*\}\}",
-                    F.col(col)
-                )
+                prompt_col = F.regexp_replace(prompt_col, r"\{\{\s*" + col + r"\s*\}\}", F.col(col))
 
         return data.withColumn(
             "request_id", F.monotonically_increasing_id().cast("string")
-        ).withColumn(
-            "prompt", prompt_col
-        )
+        ).withColumn("prompt", prompt_col)
 
     def _run_inference_with_cache(
         self,
@@ -163,7 +152,7 @@ class EvaluationRunner:
         cache_config,
     ) -> DataFrame:
         """Run inference with Delta-backed caching."""
-        from spark_llm_eval.cache import DeltaCacheManager, CacheError
+        from spark_llm_eval.cache import CacheError, DeltaCacheManager
         from spark_llm_eval.cache.config import CachePolicy
 
         cache_manager = DeltaCacheManager(
@@ -251,8 +240,8 @@ class EvaluationRunner:
     ) -> DataFrame:
         """Run inference directly without caching."""
         from spark_llm_eval.inference.batch_udf import (
-            create_inference_udf,
             INFERENCE_OUTPUT_SCHEMA,
+            create_inference_udf,
         )
 
         inference_udf = create_inference_udf(
@@ -271,14 +260,16 @@ class EvaluationRunner:
         # Join results back
         result_df = data_with_prompts.join(
             inference_results.select(
-                "request_id", "response_text", "input_tokens", "output_tokens",
-                "latency_ms", "cost_usd"
+                "request_id",
+                "response_text",
+                "input_tokens",
+                "output_tokens",
+                "latency_ms",
+                "cost_usd",
             ),
             on="request_id",
-            how="left"
-        ).withColumn(
-            "prediction", F.col("response_text")
-        )
+            how="left",
+        ).withColumn("prediction", F.col("response_text"))
 
         if not keep_prompt:
             result_df = result_df.drop("response_text", "request_id", "prompt")
@@ -310,7 +301,7 @@ class EvaluationRunner:
         self,
         data: DataFrame,
         task: EvalTask,
-    ) -> Dict[str, List[float]]:
+    ) -> dict[str, list[float]]:
         """Compute metrics on predictions.
 
         Returns dict of metric name to list of per-example scores.
@@ -327,7 +318,7 @@ class EvaluationRunner:
         references = data.select(ref_col).rdd.flatMap(lambda x: x).collect()
 
         # Collect RAG-specific columns for metrics that need them
-        extra_kwargs: Dict[str, Any] = {}
+        extra_kwargs: dict[str, Any] = {}
 
         # Query column (use input_column)
         if task.input_column in data.columns:
@@ -365,14 +356,15 @@ class EvaluationRunner:
 
     def _compute_statistics(
         self,
-        metrics: Dict[str, List[float]],
+        metrics: dict[str, list[float]],
         n_examples: int,
-    ) -> Dict[str, MetricValue]:
+    ) -> dict[str, MetricValue]:
         """Compute confidence intervals and statistics for metrics."""
         logger.info("Computing statistics...")
 
-        from spark_llm_eval.statistics import bootstrap_ci, analytical_ci_proportion
         import numpy as np
+
+        from spark_llm_eval.statistics import analytical_ci_proportion, bootstrap_ci
 
         stats_config = self.config.statistics_config
         results = {}
@@ -382,7 +374,7 @@ class EvaluationRunner:
             mean_val = float(np.mean(scores_arr))
 
             # determine if binary metric
-            is_binary = set(scores_arr.flatten()).issubset({0, 1, 0.0, 1.0, True, False})
+            is_binary = set(scores_arr.flatten()).issubset({0, 1})
 
             if is_binary and stats_config.ci_method == "analytical":
                 successes = int(np.sum(scores_arr))
@@ -411,7 +403,7 @@ class EvaluationRunner:
     def _build_result(
         self,
         task: EvalTask,
-        metrics: Dict[str, MetricValue],
+        metrics: dict[str, MetricValue],
         n_examples: int,
     ) -> EvalResult:
         """Build final EvalResult."""
@@ -473,9 +465,10 @@ class EvaluationRunner:
             return
 
         from spark_llm_eval.datasets import save_results
+
         save_results(data, output_path, mode="overwrite")
 
-    def _load_cached_responses(self) -> Optional[DataFrame]:
+    def _load_cached_responses(self) -> DataFrame | None:
         """Load cached inference responses if available."""
         if not self.config.response_cache_path:
             return None
@@ -501,7 +494,7 @@ def run_evaluation(
     data: DataFrame,
     task: EvalTask,
     model_config: ModelConfig,
-    metrics: List[str],
+    metrics: list[str],
     confidence_level: float = 0.95,
 ) -> EvalResult:
     """Convenience function for simple evaluations.

@@ -11,10 +11,9 @@ Both LLM-as-judge and embedding-based variants are provided.
 """
 
 import json
-import re
 import logging
-from abc import abstractmethod
-from dataclasses import dataclass, field
+import re
+from dataclasses import dataclass
 from typing import Any
 
 from spark_llm_eval.core.config import ModelConfig
@@ -221,23 +220,17 @@ class RAGMetric(Metric):
             if queries is None:
                 raise ValueError(f"{self.name} requires 'queries' parameter")
             if len(queries) != n:
-                raise ValueError(
-                    f"queries length ({len(queries)}) != predictions ({n})"
-                )
+                raise ValueError(f"queries length ({len(queries)}) != predictions ({n})")
 
         if self.requires_context:
             if contexts is None:
                 raise ValueError(f"{self.name} requires 'contexts' parameter")
             if len(contexts) != n:
-                raise ValueError(
-                    f"contexts length ({len(contexts)}) != predictions ({n})"
-                )
+                raise ValueError(f"contexts length ({len(contexts)}) != predictions ({n})")
 
         if self.requires_reference and references is not None:
             if len(references) != n:
-                raise ValueError(
-                    f"references length ({len(references)}) != predictions ({n})"
-                )
+                raise ValueError(f"references length ({len(references)}) != predictions ({n})")
 
     @staticmethod
     def format_context(context: Any) -> str:
@@ -682,8 +675,7 @@ def _get_sentence_transformers():
         return sentence_transformers
     except ImportError:
         raise ImportError(
-            "sentence-transformers not installed. "
-            "Install with: pip install sentence-transformers"
+            "sentence-transformers not installed. Install with: pip install sentence-transformers"
         )
 
 

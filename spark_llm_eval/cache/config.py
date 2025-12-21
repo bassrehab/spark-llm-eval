@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 
 class CachePolicy(Enum):
@@ -35,16 +34,14 @@ class CacheConfig:
     """
 
     policy: CachePolicy = CachePolicy.ENABLED
-    table_path: Optional[str] = None
-    ttl_hours: Optional[int] = None
+    table_path: str | None = None
+    ttl_hours: int | None = None
     cache_version: str = "1.0"
     track_statistics: bool = True
 
     def __post_init__(self):
         """Validate configuration."""
         if self.policy != CachePolicy.DISABLED and not self.table_path:
-            raise ValueError(
-                "table_path is required when cache policy is not DISABLED"
-            )
+            raise ValueError("table_path is required when cache policy is not DISABLED")
         if self.ttl_hours is not None and self.ttl_hours <= 0:
             raise ValueError("ttl_hours must be positive")

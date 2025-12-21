@@ -7,20 +7,19 @@ with Arrow serialization.
 
 import json
 import logging
+from collections.abc import Iterator
 from dataclasses import asdict
-from typing import Iterator
 
 import pandas as pd
-from pyspark.sql.functions import pandas_udf
 from pyspark.sql.types import (
-    StructType,
-    StructField,
-    StringType,
-    IntegerType,
     FloatType,
+    IntegerType,
+    StringType,
+    StructField,
+    StructType,
 )
 
-from spark_llm_eval.core.config import ModelConfig, ModelProvider, InferenceConfig
+from spark_llm_eval.core.config import InferenceConfig, ModelConfig, ModelProvider
 from spark_llm_eval.inference.base import InferenceEngine, InferenceRequest
 
 logger = logging.getLogger(__name__)
@@ -69,12 +68,15 @@ def _create_engine(model_config: dict, inference_config: dict) -> InferenceEngin
     # import the right engine based on provider
     if provider == ModelProvider.OPENAI:
         from spark_llm_eval.inference.openai_engine import OpenAIInferenceEngine
+
         engine = OpenAIInferenceEngine(mc, ic)
     elif provider == ModelProvider.ANTHROPIC:
         from spark_llm_eval.inference.anthropic_engine import AnthropicEngine
+
         engine = AnthropicEngine(mc, ic)
     elif provider == ModelProvider.GOOGLE:
         from spark_llm_eval.inference.gemini_engine import GeminiEngine
+
         engine = GeminiEngine(mc, ic)
     elif provider == ModelProvider.DATABRICKS:
         # TODO: implement DatabricksInferenceEngine
@@ -102,15 +104,17 @@ def _get_or_create_engine(model_config: dict, inference_config: dict) -> Inferen
 
 
 # output schema for inference results
-INFERENCE_OUTPUT_SCHEMA = StructType([
-    StructField("request_id", StringType(), False),
-    StructField("response_text", StringType(), True),
-    StructField("input_tokens", IntegerType(), True),
-    StructField("output_tokens", IntegerType(), True),
-    StructField("latency_ms", FloatType(), True),
-    StructField("cost_usd", FloatType(), True),
-    StructField("error", StringType(), True),
-])
+INFERENCE_OUTPUT_SCHEMA = StructType(
+    [
+        StructField("request_id", StringType(), False),
+        StructField("response_text", StringType(), True),
+        StructField("input_tokens", IntegerType(), True),
+        StructField("output_tokens", IntegerType(), True),
+        StructField("latency_ms", FloatType(), True),
+        StructField("cost_usd", FloatType(), True),
+        StructField("error", StringType(), True),
+    ]
+)
 
 
 def create_inference_udf(
@@ -147,9 +151,7 @@ def create_inference_udf(
     model_json = json.dumps(model_config_dict)
     inference_json = json.dumps(inference_config_dict)
 
-    def inference_batch(
-        iterator: Iterator[pd.DataFrame]
-    ) -> Iterator[pd.DataFrame]:
+    def inference_batch(iterator: Iterator[pd.DataFrame]) -> Iterator[pd.DataFrame]:
         """Process batches of prompts through the inference engine."""
         # deserialize configs
         mc = json.loads(model_json)
@@ -174,15 +176,17 @@ def create_inference_udf(
             # build output dataframe
             results = []
             for resp in responses:
-                results.append({
-                    "request_id": resp.request_id,
-                    "response_text": resp.text,
-                    "input_tokens": resp.input_tokens,
-                    "output_tokens": resp.output_tokens,
-                    "latency_ms": resp.latency_ms,
-                    "cost_usd": resp.cost_usd,
-                    "error": resp.error,
-                })
+                results.append(
+                    {
+                        "request_id": resp.request_id,
+                        "response_text": resp.text,
+                        "input_tokens": resp.input_tokens,
+                        "output_tokens": resp.output_tokens,
+                        "latency_ms": resp.latency_ms,
+                        "cost_usd": resp.cost_usd,
+                        "error": resp.error,
+                    }
+                )
 
             yield pd.DataFrame(results)
 

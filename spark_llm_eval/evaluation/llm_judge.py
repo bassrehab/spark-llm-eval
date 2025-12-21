@@ -5,13 +5,12 @@ based on custom rubrics and criteria.
 """
 
 import json
-import re
-from typing import List, Optional, Dict, Any, Callable
-from dataclasses import dataclass, field
 import logging
+import re
+from dataclasses import dataclass, field
 
-from spark_llm_eval.evaluation.base import Metric, MetricResult, register_metric
 from spark_llm_eval.core.config import ModelConfig
+from spark_llm_eval.evaluation.base import Metric, MetricResult, register_metric
 
 logger = logging.getLogger(__name__)
 
@@ -28,10 +27,11 @@ class JudgeConfig:
         include_reasoning: Whether to request reasoning from judge.
         temperature: Sampling temperature for judge.
     """
+
     model_config: ModelConfig
     rubric: str
     scale: tuple[int, int] = (1, 5)
-    criteria: List[str] = field(default_factory=list)
+    criteria: list[str] = field(default_factory=list)
     include_reasoning: bool = True
     temperature: float = 0.0
 
@@ -92,7 +92,7 @@ def _parse_judge_response(response: str, scale: tuple[int, int]) -> tuple[int, s
     # try to extract JSON
     try:
         # find JSON in response
-        json_match = re.search(r'\{[^{}]*\}', response, re.DOTALL)
+        json_match = re.search(r"\{[^{}]*\}", response, re.DOTALL)
         if json_match:
             data = json.loads(json_match.group())
             score = int(data.get("score", scale[0]))
@@ -104,7 +104,7 @@ def _parse_judge_response(response: str, scale: tuple[int, int]) -> tuple[int, s
         pass
 
     # fallback: try to extract just the number
-    numbers = re.findall(r'\b(\d+)\b', response)
+    numbers = re.findall(r"\b(\d+)\b", response)
     for num_str in numbers:
         num = int(num_str)
         if scale[0] <= num <= scale[1]:
@@ -121,7 +121,7 @@ def _parse_pairwise_response(response: str) -> tuple[str, str]:
         Tuple of (winner: A/B/tie, reasoning).
     """
     try:
-        json_match = re.search(r'\{[^{}]*\}', response, re.DOTALL)
+        json_match = re.search(r"\{[^{}]*\}", response, re.DOTALL)
         if json_match:
             data = json.loads(json_match.group())
             winner = data.get("winner", "tie").upper()
@@ -160,7 +160,7 @@ class LLMJudgeMetric(Metric):
     def __init__(
         self,
         judge_config: JudgeConfig,
-        prompt_template: Optional[str] = None,
+        prompt_template: str | None = None,
         input_column: str = "input",
     ):
         """Initialize LLM judge metric.
@@ -181,15 +181,16 @@ class LLMJudgeMetric(Metric):
             return self._inference_engine
 
         from spark_llm_eval.inference import create_engine
+
         self._inference_engine = create_engine(self.judge_config.model_config)
         self._inference_engine.initialize()
         return self._inference_engine
 
     def compute(
         self,
-        predictions: List[str],
-        references: Optional[List[str]] = None,
-        inputs: Optional[List[str]] = None,
+        predictions: list[str],
+        references: list[str] | None = None,
+        inputs: list[str] | None = None,
         **kwargs,
     ) -> MetricResult:
         """Compute LLM judge scores for predictions.
@@ -234,6 +235,7 @@ class LLMJudgeMetric(Metric):
 
             # call judge model
             from spark_llm_eval.inference.base import InferenceRequest
+
             request = InferenceRequest(
                 prompt=prompt,
                 max_tokens=256,
@@ -252,9 +254,7 @@ class LLMJudgeMetric(Metric):
             reasonings.append(reasoning)
 
         # normalize scores to 0-1 range
-        normalized_scores = [
-            (s - scale[0]) / (scale[1] - scale[0]) for s in scores
-        ]
+        normalized_scores = [(s - scale[0]) / (scale[1] - scale[0]) for s in scores]
 
         avg_score = sum(normalized_scores) / len(normalized_scores) if normalized_scores else 0.0
 
@@ -285,7 +285,7 @@ class PairwiseJudgeMetric(Metric):
     def __init__(
         self,
         judge_config: JudgeConfig,
-        prompt_template: Optional[str] = None,
+        prompt_template: str | None = None,
     ):
         """Initialize pairwise judge.
 
@@ -303,16 +303,17 @@ class PairwiseJudgeMetric(Metric):
             return self._inference_engine
 
         from spark_llm_eval.inference import create_engine
+
         self._inference_engine = create_engine(self.judge_config.model_config)
         self._inference_engine.initialize()
         return self._inference_engine
 
     def compute(
         self,
-        predictions_a: List[str],
-        predictions_b: List[str],
-        inputs: Optional[List[str]] = None,
-        references: Optional[List[str]] = None,
+        predictions_a: list[str],
+        predictions_b: list[str],
+        inputs: list[str] | None = None,
+        references: list[str] | None = None,
         **kwargs,
     ) -> MetricResult:
         """Compare two sets of predictions.
@@ -356,6 +357,7 @@ class PairwiseJudgeMetric(Metric):
             )
 
             from spark_llm_eval.inference.base import InferenceRequest
+
             request = InferenceRequest(
                 prompt=prompt,
                 max_tokens=256,
@@ -414,7 +416,7 @@ class GEvalMetric(Metric):
     def __init__(
         self,
         judge_config: JudgeConfig,
-        criteria_weights: Optional[Dict[str, float]] = None,
+        criteria_weights: dict[str, float] | None = None,
     ):
         """Initialize G-Eval metric.
 
@@ -432,15 +434,16 @@ class GEvalMetric(Metric):
             return self._inference_engine
 
         from spark_llm_eval.inference import create_engine
+
         self._inference_engine = create_engine(self.judge_config.model_config)
         self._inference_engine.initialize()
         return self._inference_engine
 
     def compute(
         self,
-        predictions: List[str],
-        references: Optional[List[str]] = None,
-        inputs: Optional[List[str]] = None,
+        predictions: list[str],
+        references: list[str] | None = None,
+        inputs: list[str] | None = None,
         **kwargs,
     ) -> MetricResult:
         """Compute G-Eval scores.
@@ -479,7 +482,7 @@ class GEvalMetric(Metric):
 
 Input: {inp}
 Response: {pred}
-{f'Reference: {ref}' if ref else ''}
+{f"Reference: {ref}" if ref else ""}
 
 Rate on a scale of {scale[0]} to {scale[1]}.
 
@@ -489,6 +492,7 @@ Then provide your rating as JSON: {{"score": <number>, "reasoning": "<explanatio
 Your evaluation:"""
 
                 from spark_llm_eval.inference.base import InferenceRequest
+
                 request = InferenceRequest(
                     prompt=prompt,
                     max_tokens=512,

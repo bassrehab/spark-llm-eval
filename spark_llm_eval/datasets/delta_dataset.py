@@ -4,11 +4,11 @@ Provides unified interface for loading evaluation datasets
 from Delta tables and saving results back.
 """
 
-from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any
-from pyspark.sql import SparkSession, DataFrame
-from pyspark.sql import functions as F
 import logging
+from dataclasses import dataclass, field
+from typing import Any
+
+from pyspark.sql import DataFrame, SparkSession
 
 logger = logging.getLogger(__name__)
 
@@ -27,13 +27,14 @@ class DatasetConfig:
         sample_size: Number of examples to sample (None for all).
         sample_seed: Random seed for sampling.
     """
+
     table_path: str
     id_column: str = "id"
     input_column: str = "input"
     reference_column: str = "reference"
-    metadata_columns: List[str] = field(default_factory=list)
-    filter_condition: Optional[str] = None
-    sample_size: Optional[int] = None
+    metadata_columns: list[str] = field(default_factory=list)
+    filter_condition: str | None = None
+    sample_size: int | None = None
     sample_seed: int = 42
 
 
@@ -57,8 +58,8 @@ class DeltaDataset:
         """
         self.spark = spark
         self.config = config
-        self._df: Optional[DataFrame] = None
-        self._count: Optional[int] = None
+        self._df: DataFrame | None = None
+        self._count: int | None = None
 
     def load(self) -> DataFrame:
         """Load dataset from Delta table.
@@ -121,10 +122,11 @@ class DeltaDataset:
             self._count = self.dataframe.count()
         return self._count
 
-    def get_version_info(self) -> Optional[Dict[str, Any]]:
+    def get_version_info(self) -> dict[str, Any] | None:
         """Get Delta table version information if available."""
         try:
             from delta.tables import DeltaTable
+
             dt = DeltaTable.forPath(self.spark, self.config.table_path)
             history = dt.history(1).collect()
             if history:
@@ -145,8 +147,8 @@ def load_dataset(
     id_column: str = "id",
     input_column: str = "input",
     reference_column: str = "reference",
-    filter_condition: Optional[str] = None,
-    sample_size: Optional[int] = None,
+    filter_condition: str | None = None,
+    sample_size: int | None = None,
 ) -> DataFrame:
     """Convenience function to load a dataset.
 
@@ -185,7 +187,7 @@ def save_results(
     df: DataFrame,
     output_path: str,
     mode: str = "overwrite",
-    partition_by: Optional[List[str]] = None,
+    partition_by: list[str] | None = None,
 ) -> None:
     """Save evaluation results to Delta table.
 
@@ -211,7 +213,7 @@ def save_results(
 
 def create_eval_dataset(
     spark: SparkSession,
-    data: List[Dict[str, Any]],
+    data: list[dict[str, Any]],
     id_column: str = "id",
     input_column: str = "input",
     reference_column: str = "reference",

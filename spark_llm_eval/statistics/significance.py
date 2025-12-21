@@ -4,10 +4,11 @@ Provides statistical tests for determining if differences between
 models are significant.
 """
 
+import logging
+from dataclasses import dataclass
+
 import numpy as np
 from scipy import stats
-from dataclasses import dataclass
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ class SignificanceResult:
         confidence_level: Confidence level used for determination.
         details: Additional test-specific information.
     """
+
     test_name: str
     statistic: float
     p_value: float
@@ -293,7 +295,8 @@ def wilcoxon_signed_rank(
         )
 
     statistic, p_value = stats.wilcoxon(
-        values_a, values_b,
+        values_a,
+        values_b,
         alternative=alternative,
         zero_method="wilcox",
     )
@@ -345,7 +348,7 @@ def choose_test(
 
     # check normality of differences
     diff = np.asarray(values_a) - np.asarray(values_b)
-    _, p_normal = stats.shapiro(diff[:min(5000, len(diff))])
+    _, p_normal = stats.shapiro(diff[: min(5000, len(diff))])
 
     if p_normal < 0.05:
         return "wilcoxon"  # non-parametric if clearly non-normal

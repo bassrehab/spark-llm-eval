@@ -7,56 +7,54 @@ including:
 - Multi-agent debate metrics
 """
 
-from spark_llm_eval.agents.trajectory import (
+from spark_llm_eval.agents.debate import (
+    Argument,
+    ArgumentDiversityMetric,
+    ArgumentQualityMetric,
     # Core types
-    TurnRole,
-    ActionType,
-    Action,
-    Observation,
-    Turn,
-    Trajectory,
-    TrajectoryPair,
-    TrajectoryMetric,
+    ArgumentType,
     # Metrics
-    GoalCompletionMetric,
-    TrajectoryEfficiencyMetric,
-    ToolCallAccuracyMetric,
-    ActionSequenceF1Metric,
+    ConsensusReachedMetric,
+    ContributionBalanceMetric,
+    DebateOutcomeAccuracyMetric,
+    DebateProgressionMetric,
+    DebateRole,
+    DebateRound,
+    DebateSession,
     # Utilities
-    parse_trajectory_from_messages,
+    parse_debate_from_messages,
 )
-
 from spark_llm_eval.agents.tool_use import (
     # Core types
     ToolCall,
+    ToolCallEfficiencyMetric,
+    ToolCallPrecisionRecallMetric,
     ToolCallSequence,
-    # Metrics
-    ToolSelectionAccuracyMetric,
+    ToolErrorRecoveryMetric,
     ToolOrderAccuracyMetric,
     ToolParameterAccuracyMetric,
-    ToolCallEfficiencyMetric,
-    ToolErrorRecoveryMetric,
-    ToolCallPrecisionRecallMetric,
+    # Metrics
+    ToolSelectionAccuracyMetric,
     # Utilities
     parse_tool_calls_from_messages,
 )
-
-from spark_llm_eval.agents.debate import (
-    # Core types
-    ArgumentType,
-    DebateRole,
-    Argument,
-    DebateRound,
-    DebateSession,
+from spark_llm_eval.agents.trajectory import (
+    Action,
+    ActionSequenceF1Metric,
+    ActionType,
     # Metrics
-    ConsensusReachedMetric,
-    ArgumentDiversityMetric,
-    ContributionBalanceMetric,
-    DebateProgressionMetric,
-    DebateOutcomeAccuracyMetric,
-    ArgumentQualityMetric,
+    GoalCompletionMetric,
+    Observation,
+    ToolCallAccuracyMetric,
+    Trajectory,
+    TrajectoryEfficiencyMetric,
+    TrajectoryMetric,
+    TrajectoryPair,
+    Turn,
+    # Core types
+    TurnRole,
     # Utilities
-    parse_debate_from_messages,
+    parse_trajectory_from_messages,
 )
 
 __all__ = [

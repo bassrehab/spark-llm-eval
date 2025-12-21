@@ -6,9 +6,9 @@ from spark_llm_eval.inference.base import (
     InferenceResponse,
 )
 from spark_llm_eval.inference.rate_limiter import (
-    TokenBucketRateLimiter,
-    RateLimitConfig,
     NoOpRateLimiter,
+    RateLimitConfig,
+    TokenBucketRateLimiter,
 )
 
 __all__ = [
@@ -28,6 +28,7 @@ _GeminiEngine = None
 
 try:
     from spark_llm_eval.inference.openai_engine import OpenAIInferenceEngine
+
     _OpenAIInferenceEngine = OpenAIInferenceEngine
     __all__.append("OpenAIInferenceEngine")
 except ImportError:
@@ -35,6 +36,7 @@ except ImportError:
 
 try:
     from spark_llm_eval.inference.anthropic_engine import AnthropicEngine
+
     _AnthropicEngine = AnthropicEngine
     __all__.append("AnthropicEngine")
 except ImportError:
@@ -42,6 +44,7 @@ except ImportError:
 
 try:
     from spark_llm_eval.inference.gemini_engine import GeminiEngine
+
     _GeminiEngine = GeminiEngine
     __all__.append("GeminiEngine")
 except ImportError:
@@ -49,10 +52,11 @@ except ImportError:
 
 try:
     from spark_llm_eval.inference.batch_udf import (
-        create_inference_udf,
         INFERENCE_OUTPUT_SCHEMA,
         cleanup_engines,
+        create_inference_udf,
     )
+
     __all__.extend(["create_inference_udf", "INFERENCE_OUTPUT_SCHEMA", "cleanup_engines"])
 except ImportError:
     pass
@@ -76,16 +80,12 @@ def create_engine(config) -> InferenceEngine:
 
     if provider == ModelProvider.OPENAI:
         if _OpenAIInferenceEngine is None:
-            raise ImportError(
-                "OpenAI not installed. Install with: pip install openai"
-            )
+            raise ImportError("OpenAI not installed. Install with: pip install openai")
         return _OpenAIInferenceEngine(config)
 
     elif provider == ModelProvider.ANTHROPIC:
         if _AnthropicEngine is None:
-            raise ImportError(
-                "Anthropic not installed. Install with: pip install anthropic"
-            )
+            raise ImportError("Anthropic not installed. Install with: pip install anthropic")
         return _AnthropicEngine(config)
 
     elif provider == ModelProvider.GOOGLE:

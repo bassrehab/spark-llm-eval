@@ -104,9 +104,7 @@ class CacheStatistics:
             "estimated_cost_saved_usd": round(self.estimated_cost_saved_usd, 4),
             "actual_api_cost_usd": round(self.actual_api_cost_usd, 4),
             "cost_savings_pct": round(self.cost_savings_pct, 2),
-            "session_duration_s": (
-                datetime.utcnow() - self.session_start
-            ).total_seconds(),
+            "session_duration_s": (datetime.utcnow() - self.session_start).total_seconds(),
         }
 
     def __str__(self) -> str:

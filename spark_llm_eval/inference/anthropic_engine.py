@@ -1,23 +1,25 @@
 """Anthropic/Claude inference."""
 
-import time
-import os
 import logging
+import os
+import time
 
-from spark_llm_eval.inference.base import InferenceEngine, InferenceRequest, InferenceResponse
 from spark_llm_eval.core.config import ModelConfig
 from spark_llm_eval.core.exceptions import InferenceError, RateLimitError
+from spark_llm_eval.inference.base import InferenceEngine, InferenceRequest, InferenceResponse
 
 logger = logging.getLogger(__name__)
 
 # lazy load the sdk
 _anthropic_module = None
 
+
 def _load_anthropic():
     global _anthropic_module
     if _anthropic_module is None:
         try:
             import anthropic
+
             _anthropic_module = anthropic
         except ImportError:
             raise ImportError("need anthropic: pip install anthropic")
@@ -64,6 +66,7 @@ class AnthropicEngine(InferenceEngine):
             # try databricks secrets - this is a bit hacky
             try:
                 from pyspark.sql import SparkSession
+
                 spark = SparkSession.getActiveSession()
                 if spark and "/" in self.config.api_key_secret:
                     scope, key_name = self.config.api_key_secret.split("/", 1)
@@ -117,9 +120,7 @@ class AnthropicEngine(InferenceEngine):
                 model=self.config.model_name,
                 max_tokens=request.max_tokens,
                 temperature=request.temperature,
-                messages=[
-                    {"role": "user", "content": request.prompt}
-                ],
+                messages=[{"role": "user", "content": request.prompt}],
                 stop_sequences=request.stop_sequences or [],
             )
 
@@ -180,16 +181,18 @@ class AnthropicEngine(InferenceEngine):
             except Exception as e:
                 logger.error(f"Batch inference failed for request: {e}")
                 # return error response
-                responses.append(InferenceResponse(
-                    text="",
-                    input_tokens=0,
-                    output_tokens=0,
-                    latency_ms=0,
-                    cost_usd=0,
-                    model=self.config.model_name,
-                    finish_reason="error",
-                    error=str(e),
-                ))
+                responses.append(
+                    InferenceResponse(
+                        text="",
+                        input_tokens=0,
+                        output_tokens=0,
+                        latency_ms=0,
+                        cost_usd=0,
+                        model=self.config.model_name,
+                        finish_reason="error",
+                        error=str(e),
+                    )
+                )
         return responses
 
     def shutdown(self) -> None:
@@ -206,8 +209,7 @@ class AnthropicEngine(InferenceEngine):
         """Get total cost in USD."""
         input_price, output_price = self._get_pricing()
         return (
-            self._total_input_tokens * input_price +
-            self._total_output_tokens * output_price
+            self._total_input_tokens * input_price + self._total_output_tokens * output_price
         ) / 1_000_000
 
     @property

@@ -1,6 +1,6 @@
 """Result types for evaluation outputs."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
@@ -8,6 +8,7 @@ from typing import Any
 @dataclass
 class MetricValue:
     """A metric value with CI. The main output type for all metrics."""
+
     value: float
     confidence_interval: tuple[float, float]
     confidence_level: float
@@ -19,9 +20,11 @@ class MetricValue:
         return f"{self.value:.4f} [{lo:.4f}, {hi:.4f}]"
 
     def __repr__(self):
-        return (f"MetricValue(value={self.value:.4f}, "
-                f"ci=[{self.confidence_interval[0]:.4f}, {self.confidence_interval[1]:.4f}], "
-                f"n={self.sample_size})")
+        return (
+            f"MetricValue(value={self.value:.4f}, "
+            f"ci=[{self.confidence_interval[0]:.4f}, {self.confidence_interval[1]:.4f}], "
+            f"n={self.sample_size})"
+        )
 
     @property
     def ci_width(self):
@@ -37,6 +40,7 @@ class MetricValue:
 @dataclass
 class ComparisonResult:
     """Result of comparing two runs (is model A better than B?)"""
+
     metric_name: str
     baseline_value: MetricValue
     comparison_value: MetricValue
@@ -58,6 +62,7 @@ class CostBreakdown:
 
     Includes both actual API costs and estimated savings from cache hits.
     """
+
     total_cost_usd: float
     input_tokens: int
     output_tokens: int
@@ -103,6 +108,7 @@ class CostBreakdown:
 @dataclass
 class LatencyStats:
     """Latency stats in milliseconds."""
+
     mean_ms: float
     median_ms: float
     p95_ms: float
@@ -118,6 +124,7 @@ class LatencyStats:
 @dataclass
 class EvalResult:
     """What you get back from runner.run(). Has metrics, costs, latencies etc."""
+
     task_id: str
     run_id: str | None
     timestamp: datetime
@@ -163,9 +170,11 @@ class EvalResult:
                 for name, val in metrics.items():
                     lines.append(f"    {name}: {val}")
 
-        lines.extend([
-            "",
-            f"Cost: ${self.cost.total_cost_usd:.4f} ({self.cost.num_requests} requests)",
-            f"Latency: {self.latency}",
-        ])
+        lines.extend(
+            [
+                "",
+                f"Cost: ${self.cost.total_cost_usd:.4f} ({self.cost.num_requests} requests)",
+                f"Latency: {self.latency}",
+            ]
+        )
         return "\n".join(lines)

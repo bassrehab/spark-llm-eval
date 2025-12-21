@@ -4,10 +4,10 @@ Supports both requests-per-minute (RPM) and tokens-per-minute (TPM)
 limits, which is what most LLM APIs use.
 """
 
-import time
-import threading
-from dataclasses import dataclass
 import logging
+import threading
+import time
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +20,7 @@ class RateLimitConfig:
         requests_per_minute: Max requests per minute (None = unlimited).
         tokens_per_minute: Max tokens per minute (None = unlimited).
     """
+
     requests_per_minute: int | None = None
     tokens_per_minute: int | None = None
 
@@ -89,13 +90,11 @@ class TokenBucketRateLimiter:
             # refill buckets based on time elapsed
             if self.rpm:
                 self._request_tokens = min(
-                    float(self.rpm),
-                    self._request_tokens + elapsed * self._request_rate
+                    float(self.rpm), self._request_tokens + elapsed * self._request_rate
                 )
             if self.tpm:
                 self._token_tokens = min(
-                    float(self.tpm),
-                    self._token_tokens + elapsed * self._token_rate
+                    float(self.tpm), self._token_tokens + elapsed * self._token_rate
                 )
 
             # calculate wait time if we don't have enough tokens
@@ -106,9 +105,7 @@ class TokenBucketRateLimiter:
                 wait_time = max(wait_time, wait_for_request)
 
             if self._token_tokens < estimated_tokens:
-                wait_for_tokens = (
-                    (estimated_tokens - self._token_tokens) / self._token_rate
-                )
+                wait_for_tokens = (estimated_tokens - self._token_tokens) / self._token_rate
                 wait_time = max(wait_time, wait_for_tokens)
 
             if wait_time > 0:
@@ -164,8 +161,7 @@ class TokenBucketRateLimiter:
                 "total_requests": self._total_requests,
                 "total_wait_time_s": self._total_wait_time,
                 "avg_wait_time_s": (
-                    self._total_wait_time / self._total_requests
-                    if self._total_requests > 0 else 0
+                    self._total_wait_time / self._total_requests if self._total_requests > 0 else 0
                 ),
                 "current_request_tokens": self._request_tokens,
                 "current_token_tokens": self._token_tokens,
