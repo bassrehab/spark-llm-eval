@@ -193,7 +193,9 @@ class DeltaCacheManager:
             - cached_df: Rows with cache hits, including response data
             - uncached_df: Rows with cache misses, need inference
         """
-        if self.config.policy == CachePolicy.DISABLED:
+        if self.config.policy in (CachePolicy.DISABLED, CachePolicy.WRITE_ONLY):
+            # DISABLED: No caching at all
+            # WRITE_ONLY: Store only, don't look up
             return self.spark.createDataFrame([], df.schema), df
 
         # Read cache table with TTL filter
@@ -328,6 +330,11 @@ class DeltaCacheManager:
         )
 
         try:
+            # Count before merge (DataFrame may be invalidated after merge)
+            stored_count = cache_data.count()
+            if stored_count == 0:
+                return
+
             # MERGE into cache table (upsert)
             cache_table = DeltaTable.forPath(self.spark, self.config.table_path)
 
@@ -344,7 +351,6 @@ class DeltaCacheManager:
                 .execute()
             )
 
-            stored_count = cache_data.count()
             self._stats.record_stores(stored_count)
             logger.info(f"Stored {stored_count} responses in cache")
 
