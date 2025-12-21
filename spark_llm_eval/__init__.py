@@ -16,7 +16,7 @@ from spark_llm_eval.core.config import (
 from spark_llm_eval.core.result import EvalResult, MetricValue
 from spark_llm_eval.core.task import EvalTask
 
-__version__ = "0.1.0"
+__version__ = "0.1.3"
 
 __all__ = [
     "EvalTask",
