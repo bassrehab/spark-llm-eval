@@ -54,23 +54,50 @@ class ComparisonResult:
 
 @dataclass
 class CostBreakdown:
-    """Cost tracking for eval run."""
+    """Cost tracking for eval run.
+
+    Includes both actual API costs and estimated savings from cache hits.
+    """
     total_cost_usd: float
     input_tokens: int
     output_tokens: int
     num_requests: int
     cached_requests: int = 0
+    estimated_savings_usd: float = 0.0  # Cost avoided via cache hits
 
     @property
-    def cost_per_example(self):
+    def cost_per_example(self) -> float:
+        """Average cost per API request."""
         if self.num_requests == 0:
             return 0.0
         return self.total_cost_usd / self.num_requests
 
     @property
-    def cache_hit_rate(self):
+    def effective_cost_per_example(self) -> float:
+        """Average cost per example including cached requests (amortized)."""
+        total_examples = self.num_requests + self.cached_requests
+        if total_examples == 0:
+            return 0.0
+        return self.total_cost_usd / total_examples
+
+    @property
+    def cache_hit_rate(self) -> float:
+        """Cache hit rate as a fraction (0-1)."""
         total = self.num_requests + self.cached_requests
         return self.cached_requests / total if total > 0 else 0.0
+
+    @property
+    def cache_savings_pct(self) -> float:
+        """Percentage of cost saved by caching (0-100)."""
+        total_potential = self.total_cost_usd + self.estimated_savings_usd
+        if total_potential == 0:
+            return 0.0
+        return (self.estimated_savings_usd / total_potential) * 100
+
+    @property
+    def total_tokens(self) -> int:
+        """Total tokens used (input + output)."""
+        return self.input_tokens + self.output_tokens
 
 
 @dataclass

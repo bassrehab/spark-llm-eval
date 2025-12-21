@@ -30,6 +30,7 @@ Current LLM evaluation tools are designed for single-machine execution. When you
 - **Statistical Rigor**: Bootstrap CIs, paired t-tests, McNemar's test, Wilcoxon, effect sizes
 - **Smart Rate Limiting**: Token bucket algorithm with RPM and TPM limits
 - **Comprehensive Metrics**: Lexical, semantic (BERTScore, embeddings), LLM-as-judge
+- **Response Caching**: Delta-backed content-addressable cache with TTL, replay mode for metrics iteration
 - **MLflow Integration**: Full experiment tracking, artifact logging, model comparison
 - **Delta Lake Native**: Versioned datasets, time travel, ACID transactions
 
@@ -254,10 +255,10 @@ black --check spark_llm_eval
 - [x] RAG evaluation metrics (context relevance, faithfulness, answer relevance, precision, recall)
 - [x] Databricks notebook examples
 - [x] PyPI package release
+- [x] Response caching (Delta-backed) with replay mode
 
 ### Planned
 - [ ] vLLM/local model support
-- [ ] Response caching (Delta-backed)
 - [ ] Unity Catalog integration
 - [ ] Databricks Asset Bundle distribution
 

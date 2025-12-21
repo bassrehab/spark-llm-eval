@@ -48,6 +48,7 @@ class EvaluationRunner:
         self.tracker = tracker  # mlflow tracker, optional
         self._start_time = None
         self._inference_engine = None
+        self._cache_stats = None  # CacheStatistics if caching enabled
 
     def run(self, data: DataFrame, task: EvalTask) -> EvalResult:
         """Run the eval. Returns EvalResult with metrics and stats."""
@@ -100,17 +101,155 @@ class EvaluationRunner:
         """Run LLM inference on data.
 
         Returns DataFrame with prediction column added.
+
+        Supports both legacy Parquet caching (via response_cache_path) and
+        new Delta-backed caching (via InferenceConfig.cache_config).
         """
         logger.info("Running inference...")
 
-        # check if we have cached predictions
-        if self.config.cache_responses and self.config.response_cache_path:
-            cached = self._load_cached_responses()
-            if cached is not None:
-                logger.info("Using cached inference responses")
-                return data.join(cached, on=task.id_column, how="left")
+        # Check for new Delta-backed caching
+        cache_config = self.config.inference_config.get_effective_cache_config()
 
-        # use the batch UDF for inference
+        from spark_llm_eval.cache.config import CachePolicy
+
+        # Legacy Parquet caching path (backward compatibility)
+        if cache_config.policy == CachePolicy.DISABLED and self.config.response_cache_path:
+            return self._run_inference_legacy(data, task)
+
+        # Prepare prompts first (needed for both caching and inference)
+        data_with_prompts = self._prepare_prompts(data, task)
+
+        # Delta-backed caching
+        if cache_config.policy != CachePolicy.DISABLED:
+            return self._run_inference_with_cache(data_with_prompts, task, cache_config)
+
+        # No caching - run inference directly
+        return self._run_inference_direct(data_with_prompts, task)
+
+    def _prepare_prompts(self, data: DataFrame, task: EvalTask) -> DataFrame:
+        """Prepare prompts from template and add request_id."""
+        template_cols = task.get_template_columns()
+        template_str = task.prompt_template
+        col_name = template_cols[0]
+
+        if len(template_cols) == 1:
+            if template_str and "{{" in template_str:
+                prompt_col = F.regexp_replace(
+                    F.lit(template_str),
+                    r"\{\{\s*" + col_name + r"\s*\}\}",
+                    F.col(col_name)
+                )
+            else:
+                prompt_col = F.col(col_name)
+        else:
+            prompt_col = F.lit(template_str)
+            for col in template_cols:
+                prompt_col = F.regexp_replace(
+                    prompt_col,
+                    r"\{\{\s*" + col + r"\s*\}\}",
+                    F.col(col)
+                )
+
+        return data.withColumn(
+            "request_id", F.monotonically_increasing_id().cast("string")
+        ).withColumn(
+            "prompt", prompt_col
+        )
+
+    def _run_inference_with_cache(
+        self,
+        data_with_prompts: DataFrame,
+        task: EvalTask,
+        cache_config,
+    ) -> DataFrame:
+        """Run inference with Delta-backed caching."""
+        from spark_llm_eval.cache import DeltaCacheManager, CacheError
+        from spark_llm_eval.cache.config import CachePolicy
+
+        cache_manager = DeltaCacheManager(
+            spark=self.spark,
+            config=cache_config,
+            model_config=self.config.model_config,
+        )
+
+        # Add cache keys
+        data_with_keys = cache_manager.add_cache_keys(data_with_prompts)
+
+        # Phase 1: Cache lookup
+        if cache_config.policy in (
+            CachePolicy.ENABLED,
+            CachePolicy.READ_ONLY,
+            CachePolicy.REPLAY,
+        ):
+            cached_df, uncached_df = cache_manager.lookup(data_with_keys)
+
+            if cache_config.policy == CachePolicy.REPLAY:
+                uncached_count = uncached_df.count()
+                if uncached_count > 0:
+                    raise CacheError(
+                        f"Replay mode requires all cache hits, "
+                        f"but {uncached_count} prompts were not cached"
+                    )
+                # All hits - return cached results
+                self._cache_stats = cache_manager.get_statistics()
+                return cached_df.drop("cache_key", "from_cache")
+        else:
+            # WRITE_ONLY - no lookup
+            cached_df = None
+            uncached_df = data_with_keys
+
+        # Phase 2: Run inference on uncached data
+        uncached_count = uncached_df.count()
+        if uncached_count > 0:
+            logger.info(f"Running inference on {uncached_count} uncached prompts")
+            fresh_results = self._run_inference_direct(uncached_df, task, keep_prompt=True)
+
+            # Phase 3: Store in cache
+            if cache_config.policy in (CachePolicy.ENABLED, CachePolicy.WRITE_ONLY):
+                cache_manager.store(
+                    fresh_results.withColumn("response_text", F.col("prediction")),
+                    task_id=task.task_id,
+                )
+        else:
+            fresh_results = None
+            logger.info("All responses served from cache!")
+
+        # Phase 4: Combine cached and fresh results
+        if cached_df is not None and fresh_results is not None:
+            # Ensure matching columns
+            cached_cols = set(cached_df.columns)
+            fresh_cols = set(fresh_results.columns)
+
+            # Add missing columns with nulls
+            for col in cached_cols - fresh_cols:
+                if col not in ("cache_key", "from_cache"):
+                    fresh_results = fresh_results.withColumn(col, F.lit(None))
+            for col in fresh_cols - cached_cols:
+                if col not in ("cache_key", "from_cache"):
+                    cached_df = cached_df.withColumn(col, F.lit(None))
+
+            result_df = cached_df.unionByName(
+                fresh_results,
+                allowMissingColumns=True,
+            )
+        elif cached_df is not None:
+            result_df = cached_df
+        else:
+            result_df = fresh_results
+
+        # Clean up temporary columns
+        result_df = result_df.drop("cache_key", "from_cache", "request_id", "prompt")
+
+        self._cache_stats = cache_manager.get_statistics()
+        return result_df
+
+    def _run_inference_direct(
+        self,
+        data_with_prompts: DataFrame,
+        task: EvalTask,
+        keep_prompt: bool = False,
+    ) -> DataFrame:
+        """Run inference directly without caching."""
         from spark_llm_eval.inference.batch_udf import (
             create_inference_udf,
             INFERENCE_OUTPUT_SCHEMA,
@@ -121,59 +260,47 @@ class EvaluationRunner:
             self.config.inference_config,
         )
 
-        # Render prompts using template
-        template_cols = task.get_template_columns()
-        template_str = task.prompt_template
-        col_name = template_cols[0]
-
-        if len(template_cols) == 1:
-            # Simple template: just use the input column as the prompt content
-            if template_str and "{{" in template_str:
-                # Use Spark SQL functions for simple template rendering
-                # Replace {{ col_name }} with the column value
-                # This avoids UDF serialization issues
-                prompt_col = F.regexp_replace(
-                    F.lit(template_str),
-                    r"\{\{\s*" + col_name + r"\s*\}\}",
-                    F.col(col_name)
-                )
-            else:
-                prompt_col = F.col(col_name)
-        else:
-            # Multiple columns - need to do multiple replacements
-            prompt_col = F.lit(template_str)
-            for col in template_cols:
-                prompt_col = F.regexp_replace(
-                    prompt_col,
-                    r"\{\{\s*" + col + r"\s*\}\}",
-                    F.col(col)
-                )
-
-        # Add request_id and prompt columns for the UDF
-        data_with_prompts = data.withColumn(
-            "request_id", F.monotonically_increasing_id().cast("string")
-        ).withColumn(
-            "prompt", prompt_col
-        )
-
-        # Select only the columns needed for inference
+        # Select only columns needed for inference
         inference_input = data_with_prompts.select("request_id", "prompt")
 
-        # Apply inference using mapInPandas
+        # Apply inference
         inference_results = inference_input.mapInPandas(
             inference_udf, schema=INFERENCE_OUTPUT_SCHEMA
         )
 
-        # Join results back to original data
+        # Join results back
         result_df = data_with_prompts.join(
-            inference_results.select("request_id", "response_text"),
+            inference_results.select(
+                "request_id", "response_text", "input_tokens", "output_tokens",
+                "latency_ms", "cost_usd"
+            ),
             on="request_id",
             how="left"
         ).withColumn(
             "prediction", F.col("response_text")
-        ).drop("response_text", "request_id", "prompt")
+        )
 
-        # cache responses if configured
+        if not keep_prompt:
+            result_df = result_df.drop("response_text", "request_id", "prompt")
+        else:
+            result_df = result_df.drop("response_text", "request_id")
+
+        return result_df
+
+    def _run_inference_legacy(self, data: DataFrame, task: EvalTask) -> DataFrame:
+        """Legacy inference path using Parquet caching."""
+        # Check for cached predictions
+        if self.config.cache_responses and self.config.response_cache_path:
+            cached = self._load_cached_responses()
+            if cached is not None:
+                logger.info("Using cached inference responses (legacy Parquet)")
+                return data.join(cached, on=task.id_column, how="left")
+
+        # Prepare and run inference
+        data_with_prompts = self._prepare_prompts(data, task)
+        result_df = self._run_inference_direct(data_with_prompts, task)
+
+        # Save to legacy cache
         if self.config.cache_responses and self.config.response_cache_path:
             self._save_responses_cache(result_df, task.id_column)
 

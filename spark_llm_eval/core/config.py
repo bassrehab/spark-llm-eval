@@ -2,7 +2,10 @@
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from spark_llm_eval.cache.config import CacheConfig
 
 
 class ModelProvider(Enum):
@@ -93,21 +96,64 @@ class StatisticsConfig:
 
 @dataclass(frozen=True)
 class InferenceConfig:
-    """Inference settings - batch size, retries, rate limits."""
+    """Inference settings - batch size, retries, rate limits, caching.
+
+    For caching, prefer using cache_config over the legacy enable_caching/cache_table
+    fields. The new CacheConfig provides more control with policies like replay mode.
+
+    Example:
+        >>> from spark_llm_eval.cache import CacheConfig, CachePolicy
+        >>> config = InferenceConfig(
+        ...     batch_size=32,
+        ...     cache_config=CacheConfig(
+        ...         policy=CachePolicy.ENABLED,
+        ...         table_path="dbfs:/mnt/cache/responses",
+        ...         ttl_hours=24,
+        ...     ),
+        ... )
+    """
     batch_size: int = 32  # tune based on your rate limits
     max_retries: int = 3
     retry_delay: float = 1.0
     timeout: float = 60.0
     rate_limit_rpm: int | None = None  # requests/min
     rate_limit_tpm: int | None = None  # tokens/min
+    # New Delta-backed caching (preferred)
+    cache_config: "CacheConfig | None" = None
+    # Legacy caching fields (deprecated, kept for backward compatibility)
     enable_caching: bool = True
     cache_table: str | None = None
 
     def __post_init__(self):
         if self.batch_size < 1:
             raise ValueError("batch_size cant be < 1")
-        # XXX: should we warn if caching enabled but no cache_table?
-        # for now the orchestrator sets it if missing
+
+    def get_effective_cache_config(self) -> "CacheConfig":
+        """Get the effective cache configuration.
+
+        Handles backward compatibility with legacy enable_caching/cache_table fields.
+
+        Returns:
+            CacheConfig with appropriate policy and settings
+        """
+        from spark_llm_eval.cache.config import CacheConfig, CachePolicy
+
+        # New config takes precedence
+        if self.cache_config is not None:
+            return self.cache_config
+
+        # Convert legacy fields to CacheConfig
+        if not self.enable_caching:
+            return CacheConfig(policy=CachePolicy.DISABLED, table_path=None)
+
+        if self.cache_table:
+            return CacheConfig(
+                policy=CachePolicy.ENABLED,
+                table_path=self.cache_table,
+            )
+
+        # Caching enabled but no table specified - disabled
+        return CacheConfig(policy=CachePolicy.DISABLED, table_path=None)
 
 
 @dataclass
