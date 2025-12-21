@@ -71,12 +71,12 @@ def create_cache_table(spark: SparkSession, table_path: str) -> None:
     # Create empty DataFrame with schema
     empty_df = spark.createDataFrame([], CACHE_TABLE_SCHEMA)
 
-    # Write with Delta Lake optimizations
+    # Write as Delta table
+    # Note: autoOptimize options are Databricks-specific and not used here
+    # for compatibility with open-source Delta Lake
     (
         empty_df.write.format("delta")
         .mode("ignore")  # Don't overwrite if exists
-        .option("delta.autoOptimize.optimizeWrite", "true")
-        .option("delta.autoOptimize.autoCompact", "true")
         .save(table_path)
     )
 
